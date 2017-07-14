@@ -1,0 +1,32 @@
+# plot on same grid, each series colored differently -- 
+# good if the series have same scale
+ggplot(df, aes(time,value)) + geom_line(aes(colour = series))
+
+# or plot on different plots
+ggplot(df, aes(time,value)) + geom_line() + facet_grid(series ~ .)
+
+
+dplyr
+==========================
+cars <- mtcars %>%
+select(cyl, mpg, hp, qsec) %>%
+group_by(cyl) %>%
+summarise(mpg = mean(mpg), hp = mean(hp), qsec = mean(qsec))
+
+DB method
+==========================
+install.packages("RMySQL")
+# Load the library
+library(RMySQL)
+library(DBI)
+con_sql <- dbConnect(RMySQL::MySQL(), group = "group-name")
+
+# List tables in current database
+dbListTables(con_sql)
+[1] "year1" "year2" "year3" "year4"
+
+# Write data.frame to MySQL
+dbWriteTable(conn = con_sql, name = 'mtcars', value = mtcars)
+
+# Read MySQL table to data.frame
+mtcars <- dbReadTable(conn = con_sql, name = 'mtcars')
