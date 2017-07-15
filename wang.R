@@ -8,7 +8,7 @@
 #'############################
 #'
 #' @param str_weather_file weather file location
-#' @param str_conf_file parameter file location
+#' @param str_param_file parameter file location
 #' @param str_outfile output prediction file location
 #' @param conf_id row id of parameters set to use from the parameter file
 #' @param sown_date the start date of simulation 
@@ -24,13 +24,14 @@
 #' @examples wang_result=wang.main("onfarm_weather.xlsx","Wang_Properties.xlsx", conf_id = 2, sown_date = "2017-03-21")
 wang.main <-
   function(str_weather_file,
-           str_conf_file,
+           str_param_file,
            str_outfile = NULL,
            conf_id = 1,
            sown_date = NULL,
            weather_actual_end = NULL,
            parameters_df = NULL,
-           weather_data_df = NULL) {
+           weather_data_df = NULL,
+           end_stage = 99) {
     library(xlsx)
     
     #' initation
@@ -38,7 +39,7 @@ wang.main <-
     ## set parameters
     if (is.null(parameters_df)) {
       parameters <- new('WangParameterSet')
-      parameters <- wang.set_conf(str_conf_file, parameters, conf_id)
+      parameters <- wang.set_param(str_param_file, parameters, conf_id)
     }else{
       parameters <- parameters_df
     }
@@ -51,7 +52,7 @@ wang.main <-
                      weather_actual_end = weather_actual_end,
                      start_date = sown_date)
     }else{
-      weather_data <- weather_data_df
+      weather_data <- subset(weather_data_df, date >= as.POSIXct(sown_date))
     }
     
     ## init variables
@@ -98,7 +99,7 @@ wang.main <-
       )
       ## log into csv file
       #wang.write_prediction(dailyPrediction)
-      if (dailyPrediction@stage_dev >= 2 || i > 1000)
+      if (dailyPrediction@stage_dev >= 2 || dailyPrediction@stage_ec >=end_stage || i > 1000)
         break
     }
     
@@ -347,15 +348,15 @@ wang.f_stage_ec <-function(dailyPrediction,parameters){
 ## misc functions
 #'#########################
 
-## read conf
-wang.set_conf <-function(str_conf_file, parameters, conf_id=1){
+## read param
+wang.set_param <-function(str_param_file, parameters, conf_id=1){
   parameters@model<-as.character("wang")
   
-  parameter_table <- read.xlsx(str_conf_file,sheetName = "parameters")
+  parameter_table <- read.xlsx(str_param_file,sheetName = "parameters")
   parameter_table <- subset(parameter_table, id==conf_id)
   
-  if(nrow(parameter_table)==0) stop("No conf in file match selected conf_id", paste(str_conf_file,conf_id,sep = "|"))
-  if(nrow(parameter_table)>1) warning("Multiple conf selected, check conf file. first row selected")
+  if(nrow(parameter_table)==0) stop("No param in file match selected conf_id", paste(str_param_file,conf_id,sep = "|"))
+  if(nrow(parameter_table)>1) warning("Multiple param set selected, check param file. first row selected")
   
   row=1
   parameters@conf_id<-as.numeric(parameter_table[row,"id"])
@@ -373,13 +374,13 @@ wang.set_conf <-function(str_conf_file, parameters, conf_id=1){
   parameters@node_mx<-as.numeric(parameter_table[row,"node_mx"])
   parameters@dev_v_max_rate<-as.numeric(parameter_table[row,"dev_v_max_rate"])
   parameters@dev_r_max_rate<-as.numeric(parameter_table[row,"dev_r_max_rate"])
-  temp_table <- read.xlsx(str_conf_file,sheetName = "temp_cardinal")
+  temp_table <- read.xlsx(str_param_file,sheetName = "temp_cardinal")
   
   parameters@temp_cardinal <- data.frame(temp_table[,-1])
   rownames(parameters@temp_cardinal)<-temp_table$phase
   
   
-  #  stage_table <- read.xlsx(file=str_conf_file, header=TRUE, sheetName = "stage_vr_ec_table")
+  #  stage_table <- read.xlsx(file=str_param_file, header=TRUE, sheetName = "stage_vr_ec_table")
   #  parameters@stage_vr_ec_table <- stage_table
   
   return(parameters)

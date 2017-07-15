@@ -192,8 +192,9 @@ writeResult<-function(str_outfile,result,parameters){
   write.xlsx(result,file=str_outfile,append=TRUE,sheetName = "Result")
 }
 
+available_stages<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
+  
 rounddown_ec<-function(stage_ec){
-  available_stages<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
   
   stage_ec<-floor(stage_ec)
   if(stage_ec %in% available_stages)return(stage_ec)
@@ -213,8 +214,15 @@ rounddown_ec<-function(stage_ec){
 }
 
 next_ec<-function(stage_ec){
-  available_stages<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
+  #available_stages<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
   stage_ec<-floor(stage_ec)
   loc<-match(stage_ec,available_stages)
   return(available_stages[loc+1])
+}
+
+
+lookup.weather_station<-function(site){
+  if(!exists("site_station_table"))site_station_table<-read_excel("./Parameters/Site_WeatherStation.xlsx");
+  site_station_row<-site_station_table[site_station_table$site==site,]
+  return(as.character(site_station_row[1,"weather_station"]))
 }
