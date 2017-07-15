@@ -30,7 +30,8 @@ cwm.main <-
            weather_actual_end = NULL,
            parameters_df = NULL,
            weather_data_df = NULL,
-           end_stage = 99) {
+           end_stage = 99,
+           verbose=TRUE) {
     library(xlsx)
     
     #' initation
@@ -66,8 +67,8 @@ cwm.main <-
     dailyPrediction@leave_emerg <- parameters@leave_emerg_init
     
     #' Modelling Loop
-    print(paste("Number available weather days: ", nrow(weather_data)))
-    cat("Start Processing: \n")
+    if(verbose)print(paste("Number available weather days: ", nrow(weather_data)))
+    if(verbose)cat("Start Processing: \n")
     for (i in 1:nrow(weather_data)) {
       weatherRow <- weather_data[i, ]
       ## bind daily weather data
@@ -86,7 +87,7 @@ cwm.main <-
         resultDF <- as.data.frame(dailyPrediction)
       }
       
-      print(
+      if(verbose)print(
         paste(
           "Day ",
           i,
@@ -99,7 +100,7 @@ cwm.main <-
       )
       ## log into csv file
       #wang.write_prediction(dailyPrediction)
-      if (dailyPrediction@stage_ec >= 99 || dailyPrediction@stage_ec >=end_stage || i > 1000)
+      if (dailyPrediction@stage_ec > 99 || dailyPrediction@stage_ec >= next_ec(end_stage) || i > 1000)
         break
     }
     
@@ -107,7 +108,7 @@ cwm.main <-
     if (!is.null(str_outfile))
       writeResult(str_outfile, resultDF, parameters)
     #write.xlsx(resultDF,file=str_outfile,append=TRUE)
-    print(paste("Row processed: ", i))
+    if(verbose)print(paste("Row processed: ", i))
     return(resultDF)
     ## close infile
     ## close outfile

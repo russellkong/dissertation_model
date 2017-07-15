@@ -124,7 +124,7 @@ setMethod("as.data.frame", "ParameterSet",
 set_weather <- function(weatherRow, dailyWeather) {
   #dailyWeather@date<-as.character(weatherRow$date)
   dailyWeather@date <-
-    as.POSIXct(weatherRow$date, format = "%m/%d/%Y %H:%M")
+    as.POSIXct(weatherRow$date, format = "%Y-%m-%d")
   dailyWeather@temp_avg <- as.numeric(weatherRow$temp_avg)
   dailyWeather@temp_min <- as.numeric(weatherRow$temp_min)
   dailyWeather@temp_max <- as.numeric(weatherRow$temp_max)
@@ -156,7 +156,7 @@ load_weather <-
       actual_weather_data <-
         read_excel(str_weather_file, sheet = "actual", n_max = endRow)
       actual_weather_data$source<-with(actual_weather_data,"actual")
-      if (is.null(weather_actual_end)) weather_actual_end<-as.character(actual_weather_data[[nrow(actual_weather_data),"date"]])
+      if (is.null(weather_actual_end)) weather_actual_end<-as.character(actual_weather_data$date[nrow(actual_weather_data)])
     }
     if ("forecast" %in% sheets) {
       forecast_weather_data <-
@@ -192,11 +192,22 @@ writeResult<-function(str_outfile,result,parameters){
   write.xlsx(result,file=str_outfile,append=TRUE,sheetName = "Result")
 }
 
-available_stages<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
-  
+#' Retrieve the trivial EC stage achieved by a simulated continuous EC value.
+#'
+#' @param stage_ec 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 rounddown_ec<-function(stage_ec){
+  #available_stages<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
   
   stage_ec<-floor(stage_ec)
+  if(stage_ec<available_stages[1]){
+    warning("input value too small, no EC stage matched",stage_ec)
+    return(stage_ec)
+  }
   if(stage_ec %in% available_stages)return(stage_ec)
   
   high<-length(available_stages)
@@ -213,16 +224,68 @@ rounddown_ec<-function(stage_ec){
   return(available_stages[min(high,low)])
 }
 
+
+#' Get the next trivial EC stage of the input value.
+#'
+#' @param stage_ec 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 next_ec<-function(stage_ec){
   #available_stages<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
-  stage_ec<-floor(stage_ec)
+  stage_ec<-rounddown_ec(stage_ec)
   loc<-match(stage_ec,available_stages)
+  if(length(available_stages)==loc){
+    warning("Ceiling stage value reached, no next EC stage available",stage_ec)
+    return(available_stages[loc])
+  }
   return(available_stages[loc+1])
 }
 
 
+#' Find corresponding weather station code of the samplied site from Mapping file
+#'
+#' @param site 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 lookup.weather_station<-function(site){
-  if(!exists("site_station_table"))site_station_table<-read_excel("./Parameters/Site_WeatherStation.xlsx");
-  site_station_row<-site_station_table[site_station_table$site==site,]
-  return(as.character(site_station_row[1,"weather_station"]))
+  if(!exists("LU.site_station_table"))LU.site_station_table<<-read_excel(str_mapping_table,sheet="Site_WeatherStation");
+  site_station<-LU.site_station_table$weather_station[LU.site_station_table$site==site]
+  if(length(site_station)==0){
+    stop("No weather station mapped to the site in Mapping file",str_mapping_table)
+    remove(LU.site_station_table)
+  }else if(!length(site_station)>1){
+    warning("More than one weather station mapped to the site in Mapping file",str_mapping_table)
+    remove(LU.site_station_table)
+  }
+  return(site_station)
+}
+
+print_debug<-function(...){
+  if(print_level>=9){
+    print(...)
+  }
+}
+print_detail<-function(...){
+  if(print_level>=5){
+    print(...)
+  }
+}
+print_progress<-function(...){
+  if(print_level>=3){
+    print(...)
+  }
+}
+print_keypoint<-function(...){
+  if(print_level>=1){
+    print(...)
+  }
+}
+print_critical<-function(...){
+  print(...)
 }

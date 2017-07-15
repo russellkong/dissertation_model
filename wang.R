@@ -31,7 +31,7 @@ wang.main <-
            weather_actual_end = NULL,
            parameters_df = NULL,
            weather_data_df = NULL,
-           end_stage = 99) {
+           end_stage = 99,verbose=TRUE) {
     library(xlsx)
     
     #' initation
@@ -64,8 +64,8 @@ wang.main <-
     dailyPrediction@stage_dev <- -0.5
     
     #' Modelling Loop
-    print(paste("Number available weather days: ", nrow(weather_data)))
-    cat("Start Processing: \n")
+    if(verbose)print_detail(paste("Number available weather days: ", nrow(weather_data)))
+    if(verbose)print_progress("Start Processing: \n")
     for (i in 1:nrow(weather_data)) {
       weatherRow <- weather_data[i,]
       ## bind daily weather data
@@ -86,7 +86,7 @@ wang.main <-
         resultDF <- as.data.frame(dailyPrediction)
       }
       
-      print(
+      if(verbose)print_detail(
         paste(
           "Day ",
           i,
@@ -99,14 +99,14 @@ wang.main <-
       )
       ## log into csv file
       #wang.write_prediction(dailyPrediction)
-      if (dailyPrediction@stage_dev >= 2 || dailyPrediction@stage_ec >=end_stage || i > 1000)
+      if (dailyPrediction@stage_dev >= 2 || dailyPrediction@stage_ec >= next_ec(end_stage) || i > 1000)
         break
     }
     
     #' Output handling
     if (!is.null(str_outfile))
       writeResult(str_outfile, resultDF, parameters)
-    print(paste("Row processed: ", i))
+    if(verbose)print_progress(paste("Row processed: ", i))
     return(resultDF)
     ## close infile
     ## close outfile
@@ -158,6 +158,7 @@ wang.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   dailyPrediction@dev_v_rate<- parameters@dev_v_max_rate *dailyPrediction@temp_resp_rate *dailyPrediction@photo_resp_rate *dailyPrediction@vern_resp_rate
   dailyPrediction@stage_dev<- dailyPrediction@stage_dev + dailyPrediction@dev_v_rate
+
   return(dailyPrediction)
 }
 
@@ -200,6 +201,9 @@ wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
     dailyPrediction@vern_temp_resp<- temp_resp_rate
   } else if(phaseInd %in% c("IF")){
     dailyPrediction@leave_temp_resp<- temp_resp_rate
+  }
+  if(is.nan(dailyPrediction@temp_resp_rate)){
+    print_debug("hold!!! dailyPrediction@temp_resp_rate is NaN")
   }
   return(dailyPrediction)
 }
@@ -278,7 +282,7 @@ wang.f_leave <-function(dailyPrediction,parameters,dailyWeather){
     dailyPrediction@leave_sum<-leave_sum
     dailyPrediction@leave_unemerge<-leave_unemerge
   }else if(dailyPrediction@stage_dev<=0.65){ ## b4 flag leave
-    leave_app_rate<- dailyPrediction@dev_v_rate*dailyPrediction@leave_unemerge/(0.65-0.2)
+    leave_app_rate<- dailyPrediction@dev_v_rate*dailyPrediction@leave_unemerge/(0.65-0.2) #stage_fi_fl_itv
     leave_sum<-dailyPrediction@leave_sum+ leave_app_rate
     
     dailyPrediction@leave_app_rate<-leave_app_rate  
@@ -366,11 +370,12 @@ wang.set_param <-function(str_param_file, parameters, conf_id=1){
   parameters@photo_sig<-as.numeric(parameter_table[row,"photo_sig"])
   parameters@photo_sen<-as.numeric(parameter_table[row,"photo_sen"])
   parameters@photo_opp<-as.numeric(parameter_table[row,"photo_opp"])
-  parameters@vern_base<-as.numeric(parameter_table[row,"vern_base"])
+  #parameters@vern_base<-as.numeric(parameter_table[row,"vern_base"])
+  
   parameters@vern_full<-as.numeric(parameter_table[row,"vern_full"])
+  parameters@vern_base<-parameters@vern_full*0.2 ##Assumed ref. EW paper
   parameters@leave_prim_mx<-as.numeric(parameter_table[row,"leave_prim_mx"])
   parameters@leave_app_mx<-as.numeric(parameter_table[row,"leave_app_mx"])
-  parameters@stage_fi_fl_itv<-as.numeric(parameter_table[row,"stage_fi_fl_itv"])
   parameters@node_mx<-as.numeric(parameter_table[row,"node_mx"])
   parameters@dev_v_max_rate<-as.numeric(parameter_table[row,"dev_v_max_rate"])
   parameters@dev_r_max_rate<-as.numeric(parameter_table[row,"dev_r_max_rate"])
