@@ -259,7 +259,7 @@ lookup.weather_station<-function(site){
   if(length(site_station)==0){
     stop("No weather station mapped to the site in Mapping file",str_mapping_table)
     remove(LU.site_station_table)
-  }else if(!length(site_station)>1){
+  }else if(length(site_station)>1){
     warning("More than one weather station mapped to the site in Mapping file",str_mapping_table)
     remove(LU.site_station_table)
   }

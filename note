@@ -33,3 +33,13 @@ mtcars <- dbReadTable(conn = con_sql, name = 'mtcars')
 
 rmse_day(PE.resultObj$resultDF[3],measured_df,87)
 wang.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2015_2016.xlsx"),"./Parameters/Wang_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx","./Phenology/P_nafferton_2016_test.xlsx"),end_stage=11)
+cwm.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"),"./Parameters/CWm_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"),conf_id=11,trail=3)
+rmse_day(PE.resultObj.working$resultDF[[length(PE.resultObj.working$resultDF)]][[1]],obs_df,30)
+
+result_b4=cwm.main("./Weather/W_100EA002_2016.xlsx","./Parameters/CWm_Parameters.xlsx",conf_id = 1, sown_date = "2016-04-17")
+result_opm=cwm.main("./Weather/W_100EA002_2016.xlsx","./Parameters/CWm_Parameters.xlsx",conf_id = 15, sown_date = "2016-04-17")
+plot.EC(wang_df = result_b4,cwm_df = result_opm)
+plot.Sim_Obs(result_b4,obs_df)
+plot.Sim_Obs(result_opm,obs_df)
+rmse_day(result_b4,obs_df)
+rmse_day(result_opm,obs_df)
