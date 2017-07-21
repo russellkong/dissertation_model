@@ -10,7 +10,7 @@
 #' @export
 #'
 #' @examples
-tool.add_photo_len<-function(str_weather_file,sheet=NULL){
+data.add_photo_len<-function(str_weather_file,sheet=NULL){
   
   sheets <- excel_sheets(str_weather_file)
   if (!is.null(sheet) && sheet %in% sheets) {
@@ -27,4 +27,30 @@ tool.add_photo_len<-function(str_weather_file,sheet=NULL){
   
   weather_data$photo_len <- daylength(lat,as.character(weather_data$date))
   write.xlsx(weather_data,file=str_weather_file,append=TRUE,sheetName = "OUTPUT")
+}
+
+#'
+#'Fill up weather dataset with missing data by replacement data
+#'10day forecast < 3day forecast <- actual
+data.fill_missing_date <- function(problemDF,replacementDF){
+  startDate<-problemDF$date[1]
+  endDate<-problemDF$date[nrow(problemDF)]
+  #check if any missing day
+  if(nrow(problemDF)<as.numeric(difftime(endDate,startDate,"days"))){
+    dateList<-data.frame("date"=seq.POSIXt(startDate, endDate, by="days"))
+    problemDF<-merge(dateList,problemDF,by="date",all = TRUE)
+    for(i in 1:nrow(problemDF)){
+      if(is.na(problemDF$temp_avg[i])){
+        curDate<-problemDF$date[i]
+        problemDF[i,]<-filter(replacementDF,date==curDate)[1,names(problemDF)]
+      }
+    }
+  }
+  return(problemDF)
+}
+
+tool.insertRow <- function(existingDF, newrow, r) {
+  existingDF[seq(r+1,nrow(existingDF)+1),] <- existingDF[seq(r,nrow(existingDF)),]
+  existingDF[r,] <- newrow
+  existingDF
 }

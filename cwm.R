@@ -52,7 +52,7 @@ cwm.main <-
                      weather_actual_end = weather_actual_end,
                      start_date = sown_date)
     } else{
-      weather_data <- subset(weather_data_df, date >= as.POSIXct(sown_date))
+      weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date))
     }
     
     ## init variables
@@ -69,6 +69,7 @@ cwm.main <-
     #' Modelling Loop
     if(verbose)print(paste("Number available weather days: ", nrow(weather_data)))
     if(verbose)cat("Start Processing: \n")
+    progress <- as.list(nrow(weather_data))
     for (i in 1:nrow(weather_data)) {
       weatherRow <- weather_data[i, ]
       ## bind daily weather data
@@ -81,11 +82,12 @@ cwm.main <-
       
       ##Log result
       dailyPrediction@weather_source <- dailyWeather@source
-      if (exists("resultDF")) {
-        resultDF <- rbind(resultDF, as.data.frame(dailyPrediction))
-      } else{
-        resultDF <- as.data.frame(dailyPrediction)
-      }
+      # if (i > 1) {
+      #   resultDF <- rbind(resultDF, as.data.frame(dailyPrediction))
+      # } else{
+      # resultDF <- as.data.frame(dailyPrediction)
+      # }
+      progress[[i]] <- dailyPrediction
       
       if(verbose)print(
         paste(
@@ -103,6 +105,8 @@ cwm.main <-
       if (dailyPrediction@stage_ec > 99 || dailyPrediction@stage_ec >= next_ec(end_stage) || i > 1000)
         break
     }
+    
+    resultDF<-do.call(rbind,lapply(progress,"as.data.frame"))
     
     #' Output handling
     if (!is.null(str_outfile))
@@ -307,7 +311,7 @@ cwm.set_param <-function(str_param_file, parameters, conf_id=1){
   parameters@model<-as.character("cwm")
   
   parameter_table <- read.xlsx(str_param_file,sheetName = "parameters")
-  parameter_table <- subset(parameter_table, id==conf_id)
+  parameter_table <- filter(parameter_table, id==conf_id)
   
   if(nrow(parameter_table)==0) stop("No param in file match selected conf_id", paste(str_param_file,conf_id,sep = "|"))
   if(nrow(parameter_table)>1) warning("Multiple param set selected, check param file. first row selected")

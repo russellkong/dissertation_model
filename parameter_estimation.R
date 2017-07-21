@@ -18,7 +18,7 @@ cwm.calibrate <- function(str_weather_files,
                            str_outfile = NULL,
                            conf_id = 1,
                            sown_date = NULL,
-                           weather_actual_end = NULL, end_stage=99,trail=1){
+                           weather_actual_end = NULL, end_stage=99,trail=1,store_rs=FALSE){
   
   if(!exists("PE.resultObj"))PE.resultObj<<-list()
   
@@ -35,9 +35,9 @@ cwm.calibrate <- function(str_weather_files,
   #Preload all measured data
   list_measured_data<-list()
   for(i in 1:length(str_measured_files)){
-    measured_df <- read_excel(str_measured_files[i])
+    obs_df <- read_excel(str_measured_files[i])
     #assume site specified as the same in whole column
-    list_measured_data[[as.character(measured_df$site[1])]]<-measured_df
+    list_measured_data[[as.character(obs_df$site[1])]]<-obs_df
   }
   
   #load parameters
@@ -154,17 +154,17 @@ cwm.calibrate <- function(str_weather_files,
   if(OLS_lo$value==lowest){
     print_keypoint("Use par from low guess")
     OLS<-OLS_lo
-    PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.lo
+    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.lo
   }
   if(OLS_mi$value==lowest){
     print_keypoint("Use par from mid guess")
     OLS<-OLS_mi
-    PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.mi
+    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.mi
   }
   if(OLS_hi$value==lowest){
     print_keypoint("Use par from high guess")
     OLS<-OLS_hi
-    PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.hi
+    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.hi
   }
   
   print(plot.Sim_Obs(PE.resultObj.working$resultDF[[1]][[1]],obs_df))
@@ -188,14 +188,15 @@ cwm.calibrate <- function(str_weather_files,
 #' @param weather_actual_end 
 #' @param end_stage 
 #' 
-#' @example  wang.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"),"./Parameters/Wang_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"),end_stage=40)
+#' @example  wang.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"),
+#' "./Parameters/Wang_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"),end_stage=40)
 wang.calibrate <- function(str_weather_files,
                            str_param_file,
                            str_measured_files,
                            str_outfile = NULL,
                            conf_id = 1,
                            sown_date = NULL,
-                           weather_actual_end = NULL, end_stage=99, trail=1){
+                           weather_actual_end = NULL, end_stage=99, trail=1,store_rs=FALSE){
   
   if(!exists("PE.resultObj"))PE.resultObj<<-list()
   
@@ -212,9 +213,9 @@ wang.calibrate <- function(str_weather_files,
   #Preload all measured data
   list_measured_data<-list()
   for(i in 1:length(str_measured_files)){
-    measured_df <- read_excel(str_measured_files[i])
+    obs_df <- read_excel(str_measured_files[i])
     #assume site specified as the same in whole column
-    list_measured_data[[as.character(measured_df$site[1])]]<-measured_df
+    list_measured_data[[as.character(obs_df$site[1])]]<-obs_df
   }
   
   #load parameters
@@ -246,10 +247,10 @@ wang.calibrate <- function(str_weather_files,
   end_stage<-list()
   
   param_opti[[1]]<-c("temp_emerg_sum")
-  param_init[[1]]<-c(150)
+  param_init[[1]]<-c(77)
   param_lower[[1]]<-c(0)
   param_upper[[1]]<-c(300)
-  parscale[[1]]<-c(10000,100)
+  parscale[[1]]<-c(10000)
   end_stage[1]<-11
   
   i=2
@@ -311,18 +312,24 @@ wang.calibrate <- function(str_weather_files,
   if(OLS_lo$value==lowest){
     print_keypoint("Use par from low guess")
     OLS<-OLS_lo
-    PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.lo
+    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.lo
   }
   if(OLS_mi$value==lowest){
     print_keypoint("Use par from mid guess")
     OLS<-OLS_mi
-    PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.mi
+    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.mi
   }
   if(OLS_hi$value==lowest){
     print_keypoint("Use par from high guess")
     OLS<-OLS_hi
-    PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.hi
+    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.hi
   }
+  
+  print(plot.Sim_Obs(PE.resultObj.working$resultDF[[1]][[1]],obs_df))
+  i=length(PE.resultObj.working$resultDF)
+  #for(i in 1:length(PE.resultObj.working$resultDF)){
+  print(plot.Sim_Obs(PE.resultObj.working$resultDF[[i]][[1]],obs_df))
+  #}
   
   return(OLS)
   
@@ -341,7 +348,7 @@ wang.calibrate <- function(str_weather_files,
 #' @param list_measured_data 
 #' @param end_stage 
 #' @param param_def 
-wang.rmse <- function(param_custom, param_custom_opti,list_weather_data,param_def, list_measured_data, end_stage
+wang.rmse <- function(param_custom, param_custom_opti,list_weather_data,param_def, list_measured_data, end_stage, retain_rs=TRUE
 ){
   #replace default values in param file
   names(param_custom)<-param_custom_opti
@@ -385,23 +392,25 @@ wang.rmse <- function(param_custom, param_custom_opti,list_weather_data,param_de
     resultDF[[list_sites[i]]] <- wang.main(parameters_df = param_def,
                         weather_data_df = weather_df,end_stage=end_stage,sown_date = sown_date, verbose=FALSE)
     
-    list_se[list_sites[i]]<-rmse_day(resultDF[[i]],measured_df,end_stage)^2
+    list_se[list_sites[i]]<-analysis.rmse_day(simDF = resultDF[[i]],obsDF = measured_df,end_stage = end_stage)^2
   }
   
   rmse<-sqrt(do.call(sum,list_se)/length(list_se))
-  print(
-    paste(names(param_custom),param_custom," RMSE:",rmse))
+  print(paste(names(param_custom),param_custom))
+  print(paste(" RMSE:",rmse))
   
-  PE.iteration<<-PE.iteration+1
-  PE.resultObj.working$param_custom_opti[[PE.iteration]]<<-param_custom_opti
-  PE.resultObj.working$param_custom[[PE.iteration]]<<-param_custom
-  PE.resultObj.working$RMSE[PE.iteration]<<-rmse
-  PE.resultObj.working$resultDF[[PE.iteration]]<<-resultDF
-  
+  if(retain_rs){
+    PE.iteration<<-ifelse(!exists("PE.iteration"),1,PE.iteration+1)
+    if(!exists("PE.resultObj.working")) PE.resultObj.working<<-list()
+    PE.resultObj.working$param_custom_opti[[PE.iteration]]<<-param_custom_opti
+    PE.resultObj.working$param_custom[[PE.iteration]]<<-param_custom
+    PE.resultObj.working$RMSE[PE.iteration]<<-rmse
+    PE.resultObj.working$resultDF[[PE.iteration]]<<-resultDF
+  }
   return(rmse)
 }
 
-cwm.rmse <- function( param_custom, param_custom_opti, list_weather_data,  param_def, list_measured_data, end_stage
+cwm.rmse <- function( param_custom, param_custom_opti, list_weather_data,  param_def, list_measured_data, end_stage, retain_rs=TRUE
 ){
   #replace default values in param file
   names(param_custom)<-param_custom_opti
@@ -436,60 +445,21 @@ cwm.rmse <- function( param_custom, param_custom_opti, list_weather_data,  param
     resultDF[[list_sites[i]]] <- cwm.main(parameters_df = param_def,
                                            weather_data_df = weather_df,end_stage=end_stage,sown_date = sown_date, verbose=FALSE)
     
-    list_se[list_sites[i]]<-rmse_day(resultDF[[i]],measured_df,end_stage)^2
+    list_se[list_sites[i]]<-analysis.rmse_day(simDF = resultDF[[i]],obsDF = measured_df,end_stage = end_stage)^2
   }
   
   rmse<-sqrt(do.call(sum,list_se)/length(list_se))
   print(
     paste(names(param_custom),param_custom," RMSE:",rmse))
   
-  PE.iteration<<-PE.iteration+1
-  PE.resultObj.working$param_custom_opti[[PE.iteration]]<<-param_custom_opti
-  PE.resultObj.working$param_custom[[PE.iteration]]<<-param_custom
-  PE.resultObj.working$RMSE[PE.iteration]<<-rmse
-  PE.resultObj.working$resultDF[[PE.iteration]]<<-resultDF
-  
+  if(retain_rs){
+    if(exists("PE.iteration"))PE.iteration<<-PE.iteration+1
+    if(!exists("PE.resultObj.working")) PE.resultObj.working<<-list()
+    PE.resultObj.working$param_custom_opti[[PE.iteration]]<<-param_custom_opti
+    PE.resultObj.working$param_custom[[PE.iteration]]<<-param_custom
+    PE.resultObj.working$RMSE[PE.iteration]<<-rmse
+    PE.resultObj.working$resultDF[[PE.iteration]]<<-resultDF
+  }
   return(rmse)
 }
 
-rmse_day <- function(resultDF,measured_set,end_stage=99) {
-  list_se<-c()
-  #mode 1: single stage
-  # measured_stage <- measured_set[1,"stage_ec"]
-  # result<-subset(resultDF,stage_ec>=measured_stage & stage_ec<measured_stage+1)
-  # rmse<-(measured_set[1,"day"]-mean(result$day))^2
-  # rmse_array<-append(rmse_array,rmse)
-  #mode 2: multiple stages
-  for(i in 1:nrow(measured_set)){
-    measured_row <- measured_set[i,]
-    
-    #skip sown date record
-    if(measured_row$stage_ec==0||measured_row$day==0)next
-    
-    # control for phasic estimation
-    if(measured_row$stage_ec>end_stage)break
-    
-    result<-subset(resultDF,stage_ec>=measured_row$stage_ec & stage_ec<next_ec(measured_row$stage_ec))
-    if(nrow(result)==0){
-      if(max(resultDF$stage_ec)>measured_row$stage_ec){
-        #case 1: stage skipped in simulation
-        # use min day of next available stage
-        result<-resultDF[resultDF$stage_ec>=next_ec(measured_row$stage_ec),][1,]
-      }else{
-        #case 2: stage unreachable
-        # keep it inf? use the last available day?
-        result<-tail(resultDF,1)
-      }
-    }
-    # If the date range of the simulated result of a stage is not containing the measured day, count error
-    error<-0
-    if(min(result$day)>measured_row$day)error <- min(result$day)-measured_row$day
-    if(max(result$day)<measured_row$day)error <- max(result$day)-measured_row$day
-    
-    se<-(error)^2
-    list_se<-append(list_se,se)
-  }
-  rmse<-sqrt(sum(list_se)/length(list_se))
-  return(rmse)
-}
-  

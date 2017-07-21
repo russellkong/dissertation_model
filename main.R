@@ -24,6 +24,8 @@ source("common.R")
 source("wang.R")
 source("cwm.R")
 source("analysis.R")
+source("plot.R")
+source("tools.R")
 source("parameter_estimation.R")
 
 init_env<-function(){
@@ -38,11 +40,24 @@ init_env<-function(){
   print_level<<-9
 }
 
-clearAll<-function(){
+clear_env<-function(){
   #common.R:lookup.weather_station
   remove(LU.site_station_table)
   
   #parameter_estimation.R: wang.rmse
-  remove(PE.resultObj)
-  remove(PE.iteration)
+  remove(PE.resultObj,pos = ".GlobalEnv" )
+  remove(PE.iteration,pos = ".GlobalEnv")
 }
+
+cal.parameter<-function(){
+  result_b4=cwm.main("./Weather/W_100EA002_2016.xlsx","./Parameters/CWm_Parameters.xlsx",conf_id = 1, sown_date = "2016-04-17")
+  result_opm=cwm.main("./Weather/W_100EA002_2016.xlsx","./Parameters/CWm_Parameters.xlsx",conf_id = 15, sown_date = "2016-04-17")
+  obsDF<- read_excel("./Phenology/P_WindsorWest_2016.xlsx")
+  plot.EC(wang_df = result_b4,cwm_df = result_opm)
+  plot.Sim_Obs(result_b4,obsDF)
+  plot.Sim_Obs(result_opm,obsDF)
+  rmse_day(result_b4,obsDF)
+  rmse_day(result_opm,obsDF)
+}
+
+profvis({plot.gradient()})

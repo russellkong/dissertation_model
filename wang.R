@@ -52,7 +52,7 @@ wang.main <-
                      weather_actual_end = weather_actual_end,
                      start_date = sown_date)
     }else{
-      weather_data <- subset(weather_data_df, date >= as.POSIXct(sown_date))
+      weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date))
     }
     
     ## init variables
@@ -61,11 +61,12 @@ wang.main <-
     # define parameters
     dailyPrediction <- new('WangPrediction')
     #dailyPrediction<- wang.init_prediction(dailyPrediction)
-    dailyPrediction@stage_dev <- -0.5
+    dailyPrediction@stage_dev <- -1
     
     #' Modelling Loop
     if(verbose)print_detail(paste("Number available weather days: ", nrow(weather_data)))
     if(verbose)print_progress("Start Processing: \n")
+    progress <- as.list(nrow(weather_data))
     for (i in 1:nrow(weather_data)) {
       weatherRow <- weather_data[i,]
       ## bind daily weather data
@@ -80,11 +81,12 @@ wang.main <-
         wang.f_stage_ec(dailyPrediction, parameters)
       ##Log result
       dailyPrediction@weather_source <- dailyWeather@source
-      if (i > 1) {
-        resultDF <- rbind(resultDF, as.data.frame(dailyPrediction))
-      } else{
-        resultDF <- as.data.frame(dailyPrediction)
-      }
+      # if (i > 1) {
+      #   resultDF <- rbind(resultDF, as.data.frame(dailyPrediction))
+      # } else{
+        # resultDF <- as.data.frame(dailyPrediction)
+      # }
+      progress[[i]] <- dailyPrediction
       
       if(verbose)print_detail(
         paste(
@@ -103,6 +105,8 @@ wang.main <-
         break
     }
     
+    resultDF<-do.call(rbind,lapply(progress,"as.data.frame"))
+    
     #' Output handling
     if (!is.null(str_outfile))
       writeResult(str_outfile, resultDF, parameters)
@@ -118,7 +122,9 @@ wang.main <-
 #' process the prediction by one time frame
 #' output: Prediction object
 wang.process<-function(dailyPrediction,parameters,dailyWeather){
-  if(dailyPrediction@stage_dev<0){
+  if(dailyPrediction@stage_dev<0.5){
+    dailyPrediction<- wang.germination(dailyPrediction,parameters,dailyWeather)
+  }else if(dailyPrediction@stage_dev<0){
     dailyPrediction<- wang.f_emerge(dailyPrediction,parameters,dailyWeather)
     #  }else if(dailyPrediction@stage_dev<0.4){
     #    wang.f_terminal_spikelet()
@@ -137,7 +143,14 @@ wang.process<-function(dailyPrediction,parameters,dailyWeather){
   
   return(dailyPrediction)
 }
-
+## ref. P2., (J.R.Kiniry 1986- CERES-Maize) Assume same as CW model such that 1 day
+wang.germination<-function(dailyPrediction,parameters,dailyWeather){
+  dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
+  
+  dailyPrediction@dev_em_rate<- 0.5
+  dailyPrediction@stage_dev<- dailyPrediction@stage_dev+dailyPrediction@dev_em_rate
+  return(dailyPrediction)
+}
 ##ref. P.3
 wang.f_emerge<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
@@ -158,7 +171,9 @@ wang.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   dailyPrediction@dev_v_rate<- parameters@dev_v_max_rate *dailyPrediction@temp_resp_rate *dailyPrediction@photo_resp_rate *dailyPrediction@vern_resp_rate
   dailyPrediction@stage_dev<- dailyPrediction@stage_dev + dailyPrediction@dev_v_rate
-
+  if(is.nan(dailyPrediction@dev_v_rate)){
+    print_debug("hold!!! dailyPrediction@dev_v_rate is NaN")
+  }
   return(dailyPrediction)
 }
 
@@ -169,6 +184,9 @@ wang.f_maturity<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   dailyPrediction@dev_r_rate<- parameters@dev_r_max_rate*dailyPrediction@temp_resp_rate
   dailyPrediction@stage_dev<- dailyPrediction@stage_dev + dailyPrediction@dev_r_rate
+  if(is.nan(dailyPrediction@dev_v_rate)){
+    print_debug("hold!!! dailyPrediction@dev_v_rate is NaN")
+  }
   return(dailyPrediction)
 }
 
@@ -187,6 +205,7 @@ wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
     temp_min<-parameters@temp_cardinal[phaseInd,"MIN"]
     temp_opt<-parameters@temp_cardinal[phaseInd,"OPT"]
     
+    if(temp_max<=temp_opt || temp_opt<=temp_min){warning("Temperature min,opt,max not in sequence",c(phaseInd,temp_max,temp_opt,temp_min))}
     alpha<-log(2)/log((temp_max-temp_min)/(temp_opt-temp_min))
     dailyPrediction@alpha<-alpha
     
@@ -195,6 +214,10 @@ wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
   }else{
     temp_resp_rate<-0
   }
+  if(is.nan(temp_resp_rate)){
+    print_debug("hold!!! temp_resp_rate is NaN")
+  }
+  
   if(phaseInd %in% c("V","R")){
     dailyPrediction@temp_resp_rate<- temp_resp_rate
   } else if(phaseInd %in% c("VN")){
@@ -202,9 +225,7 @@ wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
   } else if(phaseInd %in% c("IF")){
     dailyPrediction@leave_temp_resp<- temp_resp_rate
   }
-  if(is.nan(dailyPrediction@temp_resp_rate)){
-    print_debug("hold!!! dailyPrediction@temp_resp_rate is NaN")
-  }
+  
   return(dailyPrediction)
 }
 
@@ -253,6 +274,9 @@ wang.f_vern_resp <-function(dailyPrediction,parameters,dailyWeather){
     )
     dailyPrediction@vern_temp_sum<-vern_temp_sum
     dailyPrediction@vern_resp_rate<-vern_resp_rate
+  }
+  if(is.nan(dailyPrediction@vern_temp_resp)){
+    print_debug("hold!!! dailyPrediction@vern_temp_resp is NaN")
   }
   return(dailyPrediction)
 }
@@ -357,7 +381,7 @@ wang.set_param <-function(str_param_file, parameters, conf_id=1){
   parameters@model<-as.character("wang")
   
   parameter_table <- read.xlsx(str_param_file,sheetName = "parameters")
-  parameter_table <- subset(parameter_table, id==conf_id)
+  parameter_table <- filter(parameter_table, id==conf_id)
   
   if(nrow(parameter_table)==0) stop("No param in file match selected conf_id", paste(str_param_file,conf_id,sep = "|"))
   if(nrow(parameter_table)>1) warning("Multiple param set selected, check param file. first row selected")
