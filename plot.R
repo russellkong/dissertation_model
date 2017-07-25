@@ -18,33 +18,55 @@ plot.EC <- function(wangDF, cwmDF) {
     xlab("Day")
 }
 
-#' Title
+#' Plot observed GS with one/list of simulated GS
 #'
-#' @param sim_df 
-#' @param obs_df 
+#' @param obsDF 
+#' @param simDF result from simulation
+#' @param simDFs Assigned would ignore simDF
+#' @param simDFs_leg Labeling of each simulated dataset
+#' @param title title of the graph
 #'
 #' @return
 #' @export
 #'
 #' @examples plot.Sim_Obs(PE.resultObj.working$resultDF[[147]][[1]],measured_df)
-plot.Sim_Obs <- function(simDF, obsDF) {
-  rs_sim<- simDF[,c("day","stage_ec")]
+plot.Sim_Obs <- function(obsDF,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NULL) {
+  rs_sim<-list()
+  if(!is.null(simDFs)){
+    for(i in 1:length(simDFs)){
+      rs_sim[[i]]<-simDFs[[i]][,c("day","stage_ec")]
+      names(rs_sim[[i]])<-c("day",paste(simDFs_leg[i],"_ec",sep = ""))
+    }
+  }else
+  if(!is.null(simDF)){
+    rs_sim[[1]]<- simDF[,c("day","stage_ec")]
+    names(rs_sim[[1]])<-c("day","sim_ec")
+  }
+  
   rs_obs<- obsDF[,c("day","stage_ec")]
+  names(rs_obs) <-c("day","obs_ec")
   
-  rs_sim$sim_ec <- rs_sim$stage_ec
-  rs_obs$obs_ec <- rs_obs$stage_ec
+  rs1<-rs_obs
+  for(i in 1:length(rs_sim)){
+    rs1<-merge(rs1,rs_sim[[i]],by="day",all=TRUE)
+  }
   
-  rs1<-merge(rs_sim,rs_obs,by="day",all=TRUE)
-  
-  ggplot(rs1)+
+  p<-ggplot(rs1)+
     geom_point( aes(x=day,y=obs_ec,colour="Observed"),shape=18,size=4)+
-    geom_point( aes(x=day,y=sim_ec,colour="Simulated"),shape=4)+
-    geom_line( aes(x=day,y=sim_ec,colour="Simulated"),size=1)+
+    
     ylab("Growth Stage (BBCH)") +
-    xlab("Day")
+    xlab("Day") +
+    ggtitle(title)
   
+  p_str<-"p <- p "
+  for(i in 1:length(rs_sim)){
+    p_str<-paste(p_str,"+ geom_point( aes(x=day,y=",simDFs_leg[i],"_ec,colour=paste(\"Simulated_",simDFs_leg[i],"\")),shape=4) +
+              geom_line( aes(x=day,y=",simDFs_leg[i],"_ec,colour=paste(\"Simulated_",simDFs_leg[i],"\")),size=1)",sep = "")
+  }
+  print_debug(p_str)
+  eval(parse(text=p_str))
+  return(p)
 }
-
 
 #' Plat the geographic curve to optim zone
 #' HOW????

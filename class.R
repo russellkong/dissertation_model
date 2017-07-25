@@ -47,17 +47,18 @@ setClass("WangParameterSet",
            temp_emerg_sum="numeric",
            temp_base="numeric",
            photo_crit="numeric",
-           photo_sig="numeric",
-           photo_sen="numeric",
-           photo_opp="numeric",
+           photo_sig="numeric", #'[1:long day plant|-1:short day plant]
+           photo_sen="numeric", #'omega value photoperiod sensitivity factor
+           photo_opp="numeric", #'set as constant [17.7h: long-day crops (wheat, barley, oat, rye, flax, rape),
+                                #' 12.5h: maize, 12h: sorghum, 12-14h: Mungbeans]
            vern_base="numeric",
            vern_full="numeric",
            leave_prim_mx="numeric",
            leave_app_mx="numeric",
            node_mx="numeric",
            stage_vr_ec_table="numeric",
-           dev_v_max_rate="numeric",
-           dev_r_max_rate="numeric"
+           dev_v_min_day="numeric",
+           dev_r_min_day="numeric"
          ), contains = "ParameterSet")
 
 

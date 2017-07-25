@@ -18,7 +18,7 @@ cwm.calibrate <- function(str_weather_files,
                            str_outfile = NULL,
                            conf_id = 1,
                            sown_date = NULL,
-                           weather_actual_end = NULL, end_stage=99,trail=1,store_rs=FALSE){
+                           weather_actual_end = NULL, end_stage=99,trail_start=NULL,trail_end=NULL,store_rs=FALSE){
   
   if(!exists("PE.resultObj"))PE.resultObj<<-list()
   
@@ -72,110 +72,64 @@ cwm.calibrate <- function(str_weather_files,
   parscale[[1]]<-c(10000)
   end_stage[1]<-12
   
-  param_opti[[2]]<-c("phyllochron")
-  param_init[[2]]<-c(20)
-  param_lower[[2]]<-c(10)
-  param_upper[[2]]<-c(100)
-  parscale[[2]]<-c(1000)
-  end_stage[2]<-30
+  i=i+1
+  param_opti[[i]]<-c("phyllochron")
+  param_init[[i]]<-c(80)
+  param_lower[[i]]<-c(40)
+  param_upper[[i]]<-c(120)
+  parscale[[i]]<-c(1000)
+  end_stage[i]<-60
   
-  i=3
-  param_opti[[i]]<-c("p1d",	"p1v"	,"phyllochron")
-  param_init[[i]]<-c(2.76,	8.84,30)
-  param_lower[[i]]<-c(1,1,20)
-  param_upper[[i]]<-c(20,20,100)
-  parscale[[i]]<-c(100,100,100)
+  i=i+1
+  param_opti[[i]]<-c("p1d",	"p1v")
+  param_init[[i]]<-c(1.5,	4)
+  param_lower[[i]]<-c(0,0)
+  param_upper[[i]]<-c(3,8)
+  parscale[[i]]<-c(100,100)
   end_stage[i]<-30
   
-  i=4
+  i=i+1
   param_opti[[i]]<-c("plastochron"	)
   param_init[[i]]<-c(49.14)
   param_lower[[i]]<-c(0)
   param_upper[[i]]<-c(58)
   parscale[[i]]<-c(1000)
-  end_stage[i]<-57
+  end_stage[i]<-40
   
-  i=5
+  i=i+1
   param_opti[[i]]<-c("t_sum_internode","ph39")
   param_init[[i]]<-c(72,101)
   param_lower[[i]]<-c(0,0)
   param_upper[[i]]<-c(150,200)
   parscale[[i]]<-c(100,1000)
-  end_stage[i]<-57
+  end_stage[i]<-40
   
-  i=6
+  i=i+1
   param_opti[[i]]<-c("p5")
   param_init[[i]]<-c(11.64)
   param_lower[[i]]<-c(0)
   param_upper[[i]]<-c(150)
-  parscale[[i]]<-c(1000)
+  parscale[[i]]<-c(10000)
   end_stage[i]<-92
   
   ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  i=trail #trail
-  PE.iteration<<-0
-  PE.resultObj.working<<-list()
-  system.time(OLS_lo <- 
-                try(optim(par=param_init[[i]]*0.75, 
-                          fn=cwm.rmse,lower = param_lower[[i]], upper = param_upper[[i]], method="Nelder-Mead", control = list(parscale=parscale[[i]]),
-                          param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
-                          list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]))
-                )
-  )
-  PE.resultObj.working.lo<-PE.resultObj.working
-  
-  PE.iteration<<-0
-  PE.resultObj.working<<-list()
-  system.time(OLS_mi <- 
-                try(optim(par=param_init[[i]], 
-                          fn=cwm.rmse,lower = param_lower[[i]], upper = param_upper[[i]], method="Nelder-Mead", control = list(parscale=parscale[[i]]),
-                          param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
-                          list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]))
-                )
-  )
-  PE.resultObj.working.mi<-PE.resultObj.working
-  
-  PE.iteration<<-0
-  PE.resultObj.working<<-list()
-  system.time(OLS_hi <- 
-                try(optim(par=param_init[[i]]*1.25, 
-                          fn=cwm.rmse,lower = param_lower[[i]], upper = param_upper[[i]], method="Nelder-Mead", control = list(parscale=parscale[[i]]),
-                          param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
-                          list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]))
-                )
-  )
-  PE.resultObj.working.hi<-PE.resultObj.working
-  
-  print_progress(paste("RMSE of each guess: ",OLS_lo$value,"|",OLS_mi$value,"|",OLS_hi$value))
-  print_keypoint(OLS_lo$par)
-  print_keypoint(OLS_mi$par)
-  print_keypoint(OLS_hi$par)
-  lowest<-min(OLS_lo$value,OLS_mi$value,OLS_hi$value)
-  if(OLS_lo$value==lowest){
-    print_keypoint("Use par from low guess")
-    OLS<-OLS_lo
-    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.lo
-  }
-  if(OLS_mi$value==lowest){
-    print_keypoint("Use par from mid guess")
-    OLS<-OLS_mi
-    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.mi
-  }
-  if(OLS_hi$value==lowest){
-    print_keypoint("Use par from high guess")
-    OLS<-OLS_hi
-    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.hi
+  parameters_def_hist<-list()
+  parameters_def_hist<-as.data.frame(parameters_def)
+  for(i in 1: length(param_opti)){#i=trail #trail
+    
+    OLS<-calibrate.optim(par=param_init[[i]], 
+                        fn=calibrate.cwm.rmse,
+                        lower = param_lower[[i]], upper = param_upper[[i]],parscale=parscale[[i]],
+                        param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
+                        list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]),store_rs)
+    #put optim par into parameter
+    parameters_def<-cwm.param.replace(parameters_def,param_opti[[i]],OLS$par)
+    parameters_def_hist<-rbind(parameters_def_hist,as.data.frame(parameters_def))
   }
   
-  print(plot.Sim_Obs(PE.resultObj.working$resultDF[[1]][[1]],obs_df))
-  i=length(PE.resultObj.working$resultDF)
-  #for(i in 1:length(PE.resultObj.working$resultDF)){
-    print(plot.Sim_Obs(PE.resultObj.working$resultDF[[i]][[1]],obs_df))
-  #}
-  
-  return(OLS)
-  
+  return(parameters_def_hist)
 }
+
 #' Model parameter estimation on one dataset
 #'
 #'
@@ -188,8 +142,7 @@ cwm.calibrate <- function(str_weather_files,
 #' @param weather_actual_end 
 #' @param end_stage 
 #' 
-#' @example  wang.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"),
-#' "./Parameters/Wang_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"),end_stage=40)
+#' @example  wang.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"), "./Parameters/Wang_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"),end_stage=40)
 wang.calibrate <- function(str_weather_files,
                            str_param_file,
                            str_measured_files,
@@ -231,14 +184,15 @@ wang.calibrate <- function(str_weather_files,
   # "vern_full", 46
   # 11-60
   # "temp_v_min",  "temp_v_opt",  "temp_v_max",
-  # "dev_v_max_rate", "photo_crit",  "photo_sig",  "photo_sen",  "photo_opp",
+  # "dev_v_min_day", "photo_crit",  "photo_opp",
+  # "photo_sen",  
   # 14-40
-  # "temp_if_min",  "temp_if_opt",  "temp_if_max",
+  # "temp_if_opt",
   # "leave_prim_mx", "leave_app_mx",
   # "node_mx",
   # 60-92
   # "temp_r_min",  "temp_r_opt",  "temp_r_max",
-  # "dev_r_max_rate"
+  # "dev_r_min_day"
   param_opti<-list()
   param_init<-list()
   param_lower<-list()
@@ -249,46 +203,89 @@ wang.calibrate <- function(str_weather_files,
   param_opti[[1]]<-c("temp_emerg_sum")
   param_init[[1]]<-c(77)
   param_lower[[1]]<-c(0)
-  param_upper[[1]]<-c(300)
+  param_upper[[1]]<-c(100)
   parscale[[1]]<-c(10000)
   end_stage[1]<-11
   
-  i=2
-  param_opti[[i]]<-c( "temp_vn_opt","temp_vn_max","vern_full")
-  param_init[[i]]<-c(2,15,46)
-  param_lower[[i]]<-c(-1,0,1)
-  param_upper[[i]]<-c(25,40,1000)
-  parscale[[i]]<-c(1000,1000,1000)
+  i=i+1
+  param_opti[[i]]<-c( "vern_full")
+  param_init[[i]]<-c(46)
+  param_lower[[i]]<-c(1)
+  param_upper[[i]]<-c(100)
+  parscale[[i]]<-c(1000)
   end_stage[i]<-40
   
-  i=3
-  param_opti[[i]]<-c("temp_if_opt")
-  param_init[[i]]<-c(11.64)
-  param_lower[[i]]<-c(0)
-  param_upper[[i]]<-c(150)
-  parscale[[i]]<-c(1000)
-  end_stage[i]<-92
+  # i=i+1
+  # param_opti[[i]]<-c("temp_if_opt")
+  # param_init[[i]]<-c(11.64)
+  # param_lower[[i]]<-c(1)
+  # param_upper[[i]]<-c(34)
+  # parscale[[i]]<-c(1000)
+  # end_stage[i]<-40
   
+  i=i+1
+  param_opti[[i]]<-c("leave_prim_mx", "leave_app_mx","node_mx")
+  param_init[[i]]<-c(1, 0.3, 0.28)
+  param_lower[[i]]<-c(0.2, 0.1, 0.1)
+  param_upper[[i]]<-c(2,1.9,2)
+  parscale[[i]]<-c(100,100,100)
+  end_stage[i]<-40
+  
+  i=i+1
+  param_opti[[i]]<-c("dev_v_min_day", "photo_crit",  "photo_opp")
+  param_init[[i]]<-c(38,5,17.7)
+  param_lower[[i]]<-c(10,0,0)
+  param_upper[[i]]<-c(150,24,24)
+  parscale[[i]]<-c(1000,1000,1000)
+  end_stage[i]<-60
+  
+  i=i+1
+  param_opti[[i]]<-c("dev_r_min_day")
+  param_init[[i]]<-c(25)
+  param_lower[[i]]<-c(10)
+  param_upper[[i]]<-c(50)
+  parscale[[i]]<-c(1000)
+  end_stage[i]<-97
   ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  i=trail #trail
+  parameters_def_hist<-list()
+  parameters_def_hist<-as.data.frame(parameters_def)
+  for(i in 1: length(param_opti)){#i=trail #trail
+    
+    OLS<-calibrate.optim(par=param_init[[i]], 
+                         fn=calibrate.wang.rmse,
+                         lower = param_lower[[i]], upper = param_upper[[i]],parscale=parscale[[i]],
+                         param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
+                         list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]),store_rs)
+    #put optim par into parameter
+    parameters_def<-wang.param.replace(parameters_def,param_opti[[i]],OLS$par)
+    parameters_def_hist<-rbind(parameters_def_hist,as.data.frame(parameters_def))
+  }
+  
+  return(parameters_def_hist)
+  
+}
+
+
+calibrate.optim <- function(par, fn, lower, upper,parscale,param_custom_opti,list_weather_data,param_def,list_measured_data,end_stage,store_rs){
+  
   PE.iteration<<-0
   PE.resultObj.working<<-list()
   system.time(OLS_lo <- 
-                try(optim(par=param_init[[i]]*0.75, 
-                          fn=wang.rmse,lower = param_lower[[i]], upper = param_upper[[i]], method="Nelder-Mead", control = list(parscale=parscale[[i]]),
-                          param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
-                          list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]))
-                    )
-              )
+                try(optim(par=lower+(upper-lower)*0.2, 
+                          fn=fn,lower = lower, upper = upper, method="Nelder-Mead", control = list(parscale=parscale),
+                          param_custom_opti=param_custom_opti,list_weather_data=list_weather_data,param_def=param_def,
+                          list_measured_data=list_measured_data,end_stage=end_stage)
+                )
+  )
   PE.resultObj.working.lo<-PE.resultObj.working
   
   PE.iteration<<-0
   PE.resultObj.working<<-list()
   system.time(OLS_mi <- 
-                try(optim(par=param_init[[i]], 
-                          fn=wang.rmse,lower = param_lower[[i]], upper = param_upper[[i]], method="Nelder-Mead", control = list(parscale=parscale[[i]]),
-                          param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
-                          list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]))
+                try(optim(par=par, 
+                          fn=fn,lower = lower, upper = upper, method="Nelder-Mead", control = list(parscale=parscale),
+                          param_custom_opti=param_custom_opti,list_weather_data=list_weather_data,param_def=param_def,
+                          list_measured_data=list_measured_data,end_stage=end_stage)
                 )
   )
   PE.resultObj.working.mi<-PE.resultObj.working
@@ -296,10 +293,10 @@ wang.calibrate <- function(str_weather_files,
   PE.iteration<<-0
   PE.resultObj.working<<-list()
   system.time(OLS_hi <- 
-                try(optim(par=param_init[[i]]*1.25, 
-                          fn=wang.rmse,lower = param_lower[[i]], upper = param_upper[[i]], method="Nelder-Mead", control = list(parscale=parscale[[i]]),
-                          param_custom_opti=param_opti[[i]],list_weather_data=list_weather_data,param_def=parameters_def,
-                          list_measured_data=list_measured_data,end_stage=as.numeric(end_stage[i]))
+                try(optim(par=upper-(upper-lower)*0.2, 
+                          fn=fn,lower = lower, upper = upper, method="Nelder-Mead", control = list(parscale=parscale),
+                          param_custom_opti=param_custom_opti,list_weather_data=list_weather_data,param_def=param_def,
+                          list_measured_data=list_measured_data,end_stage=end_stage)
                 )
   )
   PE.resultObj.working.hi<-PE.resultObj.working
@@ -311,107 +308,34 @@ wang.calibrate <- function(str_weather_files,
   lowest<-min(OLS_lo$value,OLS_mi$value,OLS_hi$value)
   if(OLS_lo$value==lowest){
     print_keypoint("Use par from low guess")
+    PE.resultObj.working<-PE.resultObj.working.lo
     OLS<-OLS_lo
     if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.lo
-  }
-  if(OLS_mi$value==lowest){
-    print_keypoint("Use par from mid guess")
-    OLS<-OLS_mi
-    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.mi
-  }
-  if(OLS_hi$value==lowest){
-    print_keypoint("Use par from high guess")
-    OLS<-OLS_hi
-    if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.hi
-  }
+  }else
+    if(OLS_mi$value==lowest){
+      print_keypoint("Use par from mid guess")
+      PE.resultObj.working<-PE.resultObj.working.mi
+      OLS<-OLS_mi
+      if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.mi
+    }else
+      if(OLS_hi$value==lowest){
+        print_keypoint("Use par from high guess")
+        PE.resultObj.working<-PE.resultObj.working.hi
+        OLS<-OLS_hi
+        if(store_rs) PE.resultObj[[length(PE.resultObj)+1]]<<-PE.resultObj.working.hi
+      }
   
-  print(plot.Sim_Obs(PE.resultObj.working$resultDF[[1]][[1]],obs_df))
+  ##only show plot of first site, checking
+  #print(plot.Sim_Obs(PE.resultObj.working$resultDF[[1]][[1]],list_measured_data[[1]]))
   i=length(PE.resultObj.working$resultDF)
   #for(i in 1:length(PE.resultObj.working$resultDF)){
-  print(plot.Sim_Obs(PE.resultObj.working$resultDF[[i]][[1]],obs_df))
+  print(plot.Sim_Obs(simDFs=list(PE.resultObj.working$resultDF[[1]][[1]],PE.resultObj.working$resultDF[[i]][[1]]),simDFs_leg = list("start","end"),obsDF=list_measured_data[[1]],title=paste(param_custom_opti,collapse = ",")))
   #}
   
   return(OLS)
-  
 }
 
-#'=================================================
-#' Wrapper function for models 
-#' 1. fix parameters on each iteration
-#' 2. call model on each measured context
-#' 3. extract the simulated values with measured values
-#' ================================================
-#'
-#' @param param_custom 
-#' @param param_custom_opti 
-#' @param list_weather_data 
-#' @param list_measured_data 
-#' @param end_stage 
-#' @param param_def 
-wang.rmse <- function(param_custom, param_custom_opti,list_weather_data,param_def, list_measured_data, end_stage, retain_rs=TRUE
-){
-  #replace default values in param file
-  names(param_custom)<-param_custom_opti
-  if("temp_v_min" %in% param_custom_opti) param_def@temp_cardinal["V","MIN"]<-param_custom["temp_v_min"]
-  if("temp_v_opt" %in% param_custom_opti) param_def@temp_cardinal["V","OPT"]<-param_custom["temp_v_opt"]
-  if("temp_v_max" %in% param_custom_opti) param_def@temp_cardinal["V","MAX"]<-param_custom["temp_v_max"]
-  if("temp_r_min" %in% param_custom_opti) param_def@temp_cardinal["R","MIN"]<-param_custom["temp_r_min"]
-  if("temp_r_opt" %in% param_custom_opti) param_def@temp_cardinal["R","OPT"]<-param_custom["temp_r_opt"]
-  if("temp_r_max" %in% param_custom_opti) param_def@temp_cardinal["R","MAX"]<-param_custom["temp_r_max"]
-  if("temp_vn_min" %in% param_custom_opti) param_def@temp_cardinal["VN","MIN"]<-param_custom["temp_vn_min"]
-  if("temp_vn_opt" %in% param_custom_opti) param_def@temp_cardinal["VN","OPT"]<-param_custom["temp_vn_opt"]
-  if("temp_vn_max" %in% param_custom_opti) param_def@temp_cardinal["VN","MAX"]<-param_custom["temp_vn_max"]
-  if("temp_if_min" %in% param_custom_opti) param_def@temp_cardinal["IF","MIN"]<-param_custom["temp_if_min"]
-  if("temp_if_opt" %in% param_custom_opti) param_def@temp_cardinal["IF","OPT"]<-param_custom["temp_if_opt"]
-  if("temp_if_max" %in% param_custom_opti) param_def@temp_cardinal["IF","MAX"]<-param_custom["temp_if_max"]
-  
-  if("temp_emerg_sum" %in% param_custom_opti) param_def@temp_emerg_sum<-param_custom["temp_emerg_sum"]
-  if("temp_base" %in% param_custom_opti) param_def@temp_base<-param_custom["temp_base"]
-  if("photo_crit" %in% param_custom_opti) param_def@photo_crit<-param_custom["photo_crit"]
-  if("photo_sig" %in% param_custom_opti) param_def@photo_sig<-param_custom["photo_sig"]
-  if("photo_sen" %in% param_custom_opti) param_def@photo_sen<-param_custom["photo_sen"]
-  if("photo_opp" %in% param_custom_opti) param_def@photo_opp<-param_custom["photo_opp"]
-  if("vern_base" %in% param_custom_opti) param_def@vern_base<-param_custom["vern_base"]
-  if("vern_full" %in% param_custom_opti) param_def@vern_full<-param_custom["vern_full"]
-  if("leave_prim_mx" %in% param_custom_opti) param_def@leave_prim_mx<-param_custom["leave_prim_mx"]
-  if("leave_app_mx" %in% param_custom_opti) param_def@leave_app_mx<-param_custom["leave_app_mx"]
-  if("node_mx" %in% param_custom_opti) param_def@node_mx<-param_custom["node_mx"]
-  if("dev_v_max_rate" %in% param_custom_opti) param_def@dev_v_max_rate<-param_custom["dev_v_max_rate"]
-  if("dev_r_max_rate" %in% param_custom_opti) param_def@dev_r_max_rate<-param_custom["dev_r_max_rate"]
-  
-  # execute model for all available measured sites
-  resultDF<-list()
-  list_se<-list()
-  list_sites<-names(list_measured_data)
-  for(i in 1:length(list_sites)){
-    measured_df<-list_measured_data[[list_sites[i]]]
-    sown_date<-as.Date(measured_df$date[measured_df$stage_ec==0])
-    
-    weather_df<-list_weather_data[[lookup.weather_station(list_sites[i])]]
-    
-    resultDF[[list_sites[i]]] <- wang.main(parameters_df = param_def,
-                        weather_data_df = weather_df,end_stage=end_stage,sown_date = sown_date, verbose=FALSE)
-    
-    list_se[list_sites[i]]<-analysis.rmse_day(simDF = resultDF[[i]],obsDF = measured_df,end_stage = end_stage)^2
-  }
-  
-  rmse<-sqrt(do.call(sum,list_se)/length(list_se))
-  print(paste(names(param_custom),param_custom))
-  print(paste(" RMSE:",rmse))
-  
-  if(retain_rs){
-    PE.iteration<<-ifelse(!exists("PE.iteration"),1,PE.iteration+1)
-    if(!exists("PE.resultObj.working")) PE.resultObj.working<<-list()
-    PE.resultObj.working$param_custom_opti[[PE.iteration]]<<-param_custom_opti
-    PE.resultObj.working$param_custom[[PE.iteration]]<<-param_custom
-    PE.resultObj.working$RMSE[PE.iteration]<<-rmse
-    PE.resultObj.working$resultDF[[PE.iteration]]<<-resultDF
-  }
-  return(rmse)
-}
-
-cwm.rmse <- function( param_custom, param_custom_opti, list_weather_data,  param_def, list_measured_data, end_stage, retain_rs=TRUE
-){
+cwm.param.replace <-function(param_def,param_custom_opti,param_custom){
   #replace default values in param file
   names(param_custom)<-param_custom_opti
   if("temp_base" %in% param_custom_opti) param_def@temp_base<-param_custom["temp_base"]
@@ -432,6 +356,67 @@ cwm.rmse <- function( param_custom, param_custom_opti, list_weather_data,  param
   if("leave_prim_init" %in% param_custom_opti) param_def@leave_prim_init<-param_custom["leave_prim_init"]
   if("leave_emerg_init" %in% param_custom_opti) param_def@leave_emerg_init<-param_custom["leave_emerg_init"]
   
+  return(param_def)
+}
+
+
+
+wang.param.replace <-function(param_def,param_custom_opti,param_custom){
+  #replace default values in param file
+  names(param_custom)<-param_custom_opti
+  if("temp_v_min" %in% param_custom_opti) param_def@temp_cardinal["V","MIN"]<-param_custom["temp_v_min"]
+  if("temp_v_opt" %in% param_custom_opti) param_def@temp_cardinal["V","OPT"]<-param_custom["temp_v_opt"]
+  if("temp_v_max" %in% param_custom_opti) param_def@temp_cardinal["V","MAX"]<-param_custom["temp_v_max"]
+  if("temp_r_min" %in% param_custom_opti) param_def@temp_cardinal["R","MIN"]<-param_custom["temp_r_min"]
+  if("temp_r_opt" %in% param_custom_opti) param_def@temp_cardinal["R","OPT"]<-param_custom["temp_r_opt"]
+  if("temp_r_max" %in% param_custom_opti) param_def@temp_cardinal["R","MAX"]<-param_custom["temp_r_max"]
+  if("temp_vn_min" %in% param_custom_opti) param_def@temp_cardinal["VN","MIN"]<-param_custom["temp_vn_min"]
+  if("temp_vn_opt" %in% param_custom_opti) param_def@temp_cardinal["VN","OPT"]<-param_custom["temp_vn_opt"]
+  if("temp_vn_max" %in% param_custom_opti) param_def@temp_cardinal["VN","MAX"]<-param_custom["temp_vn_max"]
+  if("temp_if_min" %in% param_custom_opti) param_def@temp_cardinal["IF","MIN"]<-param_custom["temp_v_min"]
+  if("temp_if_opt" %in% param_custom_opti) param_def@temp_cardinal["IF","OPT"]<-param_custom["temp_if_opt"]
+  if("temp_if_max" %in% param_custom_opti) param_def@temp_cardinal["IF","MAX"]<-param_custom["temp_v_max"]
+  
+  if("temp_emerg_sum" %in% param_custom_opti) param_def@temp_emerg_sum<-param_custom["temp_emerg_sum"]
+  if("temp_base" %in% param_custom_opti) param_def@temp_base<-param_custom["temp_base"]
+  if("photo_crit" %in% param_custom_opti) param_def@photo_crit<-param_custom["photo_crit"]
+  if("photo_sig" %in% param_custom_opti) param_def@photo_sig<-param_custom["photo_sig"]
+  if("photo_sen" %in% param_custom_opti) param_def@photo_sen<-param_custom["photo_sen"]
+  if("photo_opp" %in% param_custom_opti) param_def@photo_opp<-param_custom["photo_opp"]
+  if("vern_full" %in% param_custom_opti) { param_def@vern_full<-param_custom["vern_full"]; param_def@vern_base<-param_def@vern_full*0.2 }
+  if("leave_prim_mx" %in% param_custom_opti) param_def@leave_prim_mx<-param_custom["leave_prim_mx"]
+  if("leave_app_mx" %in% param_custom_opti) param_def@leave_app_mx<-param_custom["leave_app_mx"]
+  if("node_mx" %in% param_custom_opti) param_def@node_mx<-param_custom["node_mx"]
+  if("dev_v_min_day" %in% param_custom_opti) param_def@dev_v_min_day<-param_custom["dev_v_min_day"]
+  if("dev_r_min_day" %in% param_custom_opti) param_def@dev_r_min_day<-param_custom["dev_r_min_day"]
+  
+  return(param_def)
+}
+
+#'=================================================
+#' Wrapper function for models 
+#' 1. fix parameters on each iteration
+#' 2. call model on each measured context
+#' 3. extract the simulated values with measured values
+#' ================================================
+#'
+#' @param param_custom 
+#' @param param_custom_opti 
+#' @param list_weather_data 
+#' @param list_measured_data 
+#' @param end_stage 
+#' @param param_def 
+calibrate.cwm.rmse <- function(...){
+  return(calibrate.rmse(modelFUN=cwm.main, paramFUN=cwm.param.replace, ...))
+}
+
+calibrate.wang.rmse <- function(...){
+  return(calibrate.rmse(modelFUN=wang.main, paramFUN=wang.param.replace, ...))
+}
+
+calibrate.rmse <-function(modelFUN,paramFUN,param_custom, param_custom_opti,list_weather_data,param_def, list_measured_data, end_stage, retain_rs=TRUE){
+  param_def<-do.call(paramFUN,list(param_def,param_custom_opti,param_custom))
+  
   # execute model for all available measured sites
   resultDF<-list()
   list_se<-list()
@@ -442,18 +427,17 @@ cwm.rmse <- function( param_custom, param_custom_opti, list_weather_data,  param
     
     weather_df<-list_weather_data[[lookup.weather_station(list_sites[i])]]
     
-    resultDF[[list_sites[i]]] <- cwm.main(parameters_df = param_def,
-                                           weather_data_df = weather_df,end_stage=end_stage,sown_date = sown_date, verbose=FALSE)
+    resultDF[[list_sites[i]]] <- do.call(modelFUN,list(parameters_df = param_def,
+                                           weather_data_df = weather_df,end_stage=end_stage,sown_date = sown_date, verbose=FALSE))
     
     list_se[list_sites[i]]<-analysis.rmse_day(simDF = resultDF[[i]],obsDF = measured_df,end_stage = end_stage)^2
   }
   
   rmse<-sqrt(do.call(sum,list_se)/length(list_se))
-  print(
-    paste(names(param_custom),param_custom," RMSE:",rmse))
+  print(paste(paste(param_custom_opti,collapse = "|"),"=",paste(param_custom,collapse = "|"),"[ RMSE=",rmse,"]"))
   
   if(retain_rs){
-    if(exists("PE.iteration"))PE.iteration<<-PE.iteration+1
+    PE.iteration<<-ifelse(!exists("PE.iteration"),1,PE.iteration+1)
     if(!exists("PE.resultObj.working")) PE.resultObj.working<<-list()
     PE.resultObj.working$param_custom_opti[[PE.iteration]]<<-param_custom_opti
     PE.resultObj.working$param_custom[[PE.iteration]]<<-param_custom
@@ -462,4 +446,3 @@ cwm.rmse <- function( param_custom, param_custom_opti, list_weather_data,  param
   }
   return(rmse)
 }
-

@@ -283,20 +283,22 @@ cwm.f_s6<-function(dailyPrediction,parameters,dailyWeather){
   return(dailyPrediction)
 }
 #'
-#'http://nowlin.css.msu.edu/wheat_book/CHAPTER2.html
-#'RDR = 1 - k(50 - V)
+#'Ritchis 1991
+#'RDR = 1 - k(50 - V); P1V = K * 183 - 0.55; useful scale 0-8
 
 cwm.f_vern<-function(dailyPrediction,parameters,dailyWeather){
-  dailyPrediction@vern_resp_rate<- 1-(parameters@p1v/10000)*(parameters@p1vd-dailyWeather@temp_avg)
+  dailyPrediction@vern_resp_rate<- 1-((parameters@p1v+0.55)/183)*(parameters@p1vd-dailyWeather@temp_avg)
   return(dailyPrediction)
 }
 
 #'
-#'http://nowlin.css.msu.edu/wheat_book/CHAPTER2.html
-#'RDR = 1 - C(20-P)^2
+#'Ritchis 1991
+#'RDR = 1 - C(20-P)^2; P1D=C*500; useful scale 0-3
 cwm.f_photo<-function(dailyPrediction,parameters,dailyWeather){
+  dailyPrediction@photo_resp_rate<- 1-(parameters@p1d/500)*(parameters@p1dt-dailyWeather@photo_len)^2
+  
   #DSSAT f90 code: long day plants
-  dailyPrediction@photo_resp_rate<- 1-(parameters@p1d/10000)*(parameters@p1dt-dailyWeather@photo_len)^2
+  #parameters@p1d/10000
   #DSSAT f90 code: short day plants
   # AMAX1(0.0,AMIN1(1.0,1.0-(ABS(P1D)/1000)*(DAYLT-P1DT)))
   return(dailyPrediction)

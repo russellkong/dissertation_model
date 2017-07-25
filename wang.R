@@ -122,7 +122,7 @@ wang.main <-
 #' process the prediction by one time frame
 #' output: Prediction object
 wang.process<-function(dailyPrediction,parameters,dailyWeather){
-  if(dailyPrediction@stage_dev<0.5){
+  if(dailyPrediction@stage_dev< -0.5){
     dailyPrediction<- wang.germination(dailyPrediction,parameters,dailyWeather)
   }else if(dailyPrediction@stage_dev<0){
     dailyPrediction<- wang.f_emerge(dailyPrediction,parameters,dailyWeather)
@@ -169,7 +169,7 @@ wang.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"V")
   dailyPrediction<- wang.f_photo_resp(dailyPrediction,parameters,dailyWeather)
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
-  dailyPrediction@dev_v_rate<- parameters@dev_v_max_rate *dailyPrediction@temp_resp_rate *dailyPrediction@photo_resp_rate *dailyPrediction@vern_resp_rate
+  dailyPrediction@dev_v_rate<- 1/parameters@dev_v_min_day *dailyPrediction@temp_resp_rate *dailyPrediction@photo_resp_rate *dailyPrediction@vern_resp_rate
   dailyPrediction@stage_dev<- dailyPrediction@stage_dev + dailyPrediction@dev_v_rate
   if(is.nan(dailyPrediction@dev_v_rate)){
     print_debug("hold!!! dailyPrediction@dev_v_rate is NaN")
@@ -181,8 +181,8 @@ wang.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
 wang.f_maturity<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"R")
   dailyPrediction<- wang.f_photo_resp(dailyPrediction,parameters,dailyWeather)
-  dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
-  dailyPrediction@dev_r_rate<- parameters@dev_r_max_rate*dailyPrediction@temp_resp_rate
+  #dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
+  dailyPrediction@dev_r_rate<- 1/parameters@dev_r_min_day *dailyPrediction@temp_resp_rate
   dailyPrediction@stage_dev<- dailyPrediction@stage_dev + dailyPrediction@dev_r_rate
   if(is.nan(dailyPrediction@dev_v_rate)){
     print_debug("hold!!! dailyPrediction@dev_v_rate is NaN")
@@ -401,8 +401,8 @@ wang.set_param <-function(str_param_file, parameters, conf_id=1){
   parameters@leave_prim_mx<-as.numeric(parameter_table[row,"leave_prim_mx"])
   parameters@leave_app_mx<-as.numeric(parameter_table[row,"leave_app_mx"])
   parameters@node_mx<-as.numeric(parameter_table[row,"node_mx"])
-  parameters@dev_v_max_rate<-as.numeric(parameter_table[row,"dev_v_max_rate"])
-  parameters@dev_r_max_rate<-as.numeric(parameter_table[row,"dev_r_max_rate"])
+  parameters@dev_v_min_day<-as.numeric(parameter_table[row,"dev_v_min_day"])
+  parameters@dev_r_min_day<-as.numeric(parameter_table[row,"dev_r_min_day"])
   temp_table <- read.xlsx(str_param_file,sheetName = "temp_cardinal")
   
   parameters@temp_cardinal <- data.frame(temp_table[,-1])
