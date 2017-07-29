@@ -115,22 +115,23 @@ setMethod("as.data.frame", "ParameterSet",
 #' Title
 #'
 #' @param weatherRow
-#' @param dailyWeather
+#' @param weatherObj
 #'
 #' @return
 #' @export
 #'
 #' @examples
-set_weather <- function(weatherRow, dailyWeather) {
+as.Weather <- function(weatherRow, weatherObj=NULL) {
   #dailyWeather@date<-as.character(weatherRow$date)
-  dailyWeather@date <-
+  if(is.null(weatherObj))weatherObj<-new("Weather")
+    weatherObj@date <-
     as.POSIXct(weatherRow$date, format = "%Y-%m-%d")
-  dailyWeather@temp_avg <- as.numeric(weatherRow$temp_avg)
-  dailyWeather@temp_min <- as.numeric(weatherRow$temp_min)
-  dailyWeather@temp_max <- as.numeric(weatherRow$temp_max)
-  dailyWeather@photo_len <- as.numeric(weatherRow$photo_len)
-  dailyWeather@source <- as.character(weatherRow$source)
-  return(dailyWeather)
+  weatherObj@temp_avg <- as.numeric(weatherRow$temp_avg)
+  weatherObj@temp_min <- as.numeric(weatherRow$temp_min)
+  weatherObj@temp_max <- as.numeric(weatherRow$temp_max)
+  weatherObj@photo_len <- as.numeric(weatherRow$photo_len)
+  weatherObj@source <- as.character(weatherRow$source)
+  return(weatherObj)
 }
 
 #' Title
@@ -145,7 +146,7 @@ set_weather <- function(weatherRow, dailyWeather) {
 #' @export
 #'
 #' @examples
-load_weather <-
+load.weather <-
   function(str_weather_file,
            start_date = NULL,
            end_date =NULL,
@@ -220,6 +221,33 @@ load_weather <-
     return(weather_data)
   }
 
+#' load a list of weather files
+#' 
+#' @param str_weather_files 
+load.weather.data<-function(str_weather_files,...){
+  
+  #Preload all weather files
+  list_weather_data<-list()
+  for(i in 1:length(str_weather_files)){
+    weather_data_df <-
+      load.weather(str_weather_files[i],...)
+    list_weather_data[[as.character(weather_data_df$site[1])]]<-weather_data_df
+  }
+  return(list_weather_data)
+}
+load.phenology.data<-function(str_measured_files){
+  
+  #Preload all measured data
+  list_measured_data<-list()
+  for(i in 1:length(str_measured_files)){
+    measured_df <- read_excel(str_measured_files[i])
+    #assume site specified as the same in whole column
+    list_measured_data[[as.character(measured_df$site[1])]]<-measured_df
+  }
+  return(list_measured_data)
+  
+}
+
 writeResult<-function(str_outfile,result,parameters){
   write.xlsx(as.data.frame(parameters),file=str_outfile,append=TRUE,sheetName = "Parameters")
   write.xlsx(result,file=str_outfile,append=TRUE,sheetName = "Result")
@@ -238,7 +266,7 @@ rounddown_ec<-function(stage_ec){
   
   stage_ec<-floor(stage_ec)
   if(stage_ec<available_stages[1]){
-    warning("input value too small, no EC stage matched",stage_ec)
+    warning("input value too small, no EC stage matched|",stage_ec)
     return(stage_ec)
   }
   if(stage_ec %in% available_stages)return(stage_ec)
@@ -254,7 +282,7 @@ rounddown_ec<-function(stage_ec){
       high<-mid
     }
   }
-  return(available_stages[min(high,low)])
+  return(as.numeric(available_stages[min(high,low)]))
 }
 
 

@@ -19,7 +19,8 @@ plot.EC <- function(wangDF, cwmDF) {
 }
 
 #' Plot observed GS with one/list of simulated GS
-#'
+#' 1. day, GS plot
+#' 2. obs GS to sim GS scatter
 #' @param obsDF 
 #' @param simDF result from simulation
 #' @param simDFs Assigned would ignore simDF
@@ -31,18 +32,25 @@ plot.EC <- function(wangDF, cwmDF) {
 #'
 #' @examples plot.Sim_Obs(PE.resultObj.working$resultDF[[147]][[1]],measured_df)
 plot.Sim_Obs <- function(obsDF,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NULL) {
+  
+  #rename fore sim DF for merge
   rs_sim<-list()
   if(!is.null(simDFs)){
+    if(is.null(simDFs_leg))simDFs_leg<-names(simDFs)
     for(i in 1:length(simDFs)){
       rs_sim[[i]]<-simDFs[[i]][,c("day","stage_ec")]
+      
       names(rs_sim[[i]])<-c("day",paste(simDFs_leg[i],"_ec",sep = ""))
     }
-  }else
-  if(!is.null(simDF)){
+  }else if(!is.null(simDF)){
+    if(is.null(simDFs_leg))simDFs_leg[1]<-"result"
     rs_sim[[1]]<- simDF[,c("day","stage_ec")]
-    names(rs_sim[[1]])<-c("day","sim_ec")
+    names(rs_sim[[1]])<-c("day",paste(simDFs_leg[1],"_ec",sep = ""))
+  }else{
+    stop("Either simDF/simDFs must be defined")
   }
   
+  #define names for observed DF for merge
   rs_obs<- obsDF[,c("day","stage_ec")]
   names(rs_obs) <-c("day","obs_ec")
   
@@ -60,12 +68,33 @@ plot.Sim_Obs <- function(obsDF,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NUL
   
   p_str<-"p <- p "
   for(i in 1:length(rs_sim)){
-    p_str<-paste(p_str,"+ geom_point( aes(x=day,y=",simDFs_leg[i],"_ec,colour=paste(\"Simulated_",simDFs_leg[i],"\")),shape=4) +
-              geom_line( aes(x=day,y=",simDFs_leg[i],"_ec,colour=paste(\"Simulated_",simDFs_leg[i],"\")),size=1)",sep = "")
+    p_str<-paste(p_str,"+ geom_point( aes(x=day,y=",simDFs_leg[i],"_ec,colour=\"Simulated_",simDFs_leg[i],"\"),shape=4) +
+              geom_line( aes(x=day,y=",simDFs_leg[i],"_ec,colour=\"Simulated_",simDFs_leg[i],"\"),size=1)",sep = "")
   }
-  print_debug(p_str)
+  print_debug(parse(text=p_str))
   eval(parse(text=p_str))
-  return(p)
+  print(p)
+  #'--------------------------------
+  #'
+ 
+  rs2<-gather(rs1, sources,sim_ec,-c(day,obs_ec))
+  print("lm")
+  print(lm(sim_ec~obs_ec,data=rs2))
+  
+  p2<-ggplot(rs2, aes(x=obs_ec,y=sim_ec))+
+    geom_point(shape=18,size=4)+
+    xlab("Observed Stage (BBCH)") +
+    ylab("Simulated Stage (BBCH)") +
+    #ggtitle(title)+ 
+    geom_smooth(method=lm,   # Add linear regression lines
+              #se=FALSE,    # Don't add shaded confidence region
+              fullrange=TRUE) # Extend regression lines
+  
+  #print_debug(parse(text=p2_str))
+  #eval(parse(text=p2_str))
+  print(p2)
+  
+  return(rs1)
 }
 
 #' Plat the geographic curve to optim zone
@@ -82,32 +111,11 @@ plot.optim_path<-function(){
   
 }
 #' c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"),"./Parameters/Wang_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx")
-prepare.data<-function(str_weather_files,
-                       str_measured_files){
-  
-  #Preload all weather files
-  list_weather_data<-list()
-  for(i in 1:length(str_weather_files)){
-    weather_data_df <-
-      load_weather(str_weather_files[i])
-    list_weather_data[[as.character(weather_data_df$site[1])]]<-weather_data_df
-  }
-  list_weather_data<<-list_weather_data
-  
-  #Preload all measured data
-  list_measured_data<-list()
-  for(i in 1:length(str_measured_files)){
-    measured_df <- read_excel(str_measured_files[i])
-    #assume site specified as the same in whole column
-    list_measured_data[[as.character(measured_df$site[1])]]<-measured_df
-  }
-  list_measured_data<<-list_measured_data
-  
-}
 
-plot.wang.gradient<-function(){
-  prepare.data( c("./Weather/W_100EA002_2016.xlsx"),c("./Phenology/P_WindsorWest_2016.xlsx"))
-  
+plot.wang.gradient<-function(str_weather_files,
+                             str_measured_files){
+  list_weather_data<-load.weather.data( str_weather_files)
+  list_measured_data<-load.phenology.data(str_measured_files)
   #load parameters
   parameters_def <- new('WangParameterSet')
   parameters_def <- wang.set_param("./Parameters/Wang_Parameters.xlsx", parameters_def, 2)

@@ -32,7 +32,6 @@ wang.main <-
            parameters_df = NULL,
            weather_data_df = NULL,
            end_stage = 99,verbose=TRUE) {
-    library(xlsx)
     
     #' initation
     
@@ -48,7 +47,7 @@ wang.main <-
     ## load Weather data
     if (is.null(weather_data_df)) {
       weather_data <-
-        load_weather(str_weather_file,
+        load.weather(str_weather_file,
                      weather_actual_end = weather_actual_end,
                      start_date = sown_date)
     }else{
@@ -60,22 +59,24 @@ wang.main <-
     
     # define parameters
     dailyPrediction <- new('WangPrediction')
-    #dailyPrediction<- wang.init_prediction(dailyPrediction)
     dailyPrediction@stage_dev <- -1
+    dailyPrediction@stage_ec <- 0
+    
+    progress <- as.list(nrow(weather_data))
     
     #' Modelling Loop
     if(verbose)print_detail(paste("Number available weather days: ", nrow(weather_data)))
     if(verbose)print_progress("Start Processing: \n")
-    progress <- as.list(nrow(weather_data))
     for (i in 1:nrow(weather_data)) {
       weatherRow <- weather_data[i,]
       ## bind daily weather data
-      dailyWeather <- set_weather(weatherRow, dailyWeather)
+      dailyWeather <- as.Weather(weatherRow, dailyWeather)
       ## process the model
       dailyPrediction@day <- i
       dailyPrediction@date <- dailyWeather@date
-      dailyPrediction <-
-        wang.process(dailyPrediction, parameters, dailyWeather)
+      if(i>1)#skip sown day
+        dailyPrediction <-
+          wang.process(dailyPrediction, parameters, dailyWeather)
       ## projection of EC stage
       dailyPrediction <-
         wang.f_stage_ec(dailyPrediction, parameters)
@@ -109,7 +110,7 @@ wang.main <-
     
     #' Output handling
     if (!is.null(str_outfile))
-      writeResult(str_outfile, resultDF, parameters)
+      writeResult(paste("./output/Wang",weather_data[1,]$site,str_outfile,sep = "_"), resultDF, parameters)
     if(verbose)print_progress(paste("Row processed: ", i))
     return(resultDF)
     ## close infile

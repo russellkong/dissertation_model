@@ -19,6 +19,7 @@ library(xlsx)
 library(dplyr)
 library(ggplot2)
 
+setwd('~/dissertation_model')
 source("class.R")
 source("common.R")
 source("wang.R")
@@ -34,10 +35,12 @@ init_env<-function(){
   str_mapping_table<<-"./Parameters/Mapping.xlsx"
   
   #common.R:rounddown_ec,next_ec
-  available_stages<<-c(1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
+  available_stages<<-c(0,1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
   
   #varbose output level 1(keypoint),3(progress),5(detail),9(debug)
   print_level<<-9
+  
+  setwd('~/dissertation_data')
 }
 
 clear_env<-function(){
@@ -60,4 +63,7 @@ cal.parameter<-function(){
   rmse_day(result_opm,obsDF)
 }
 
-profvis({plot.gradient()})
+load_prof <-function(str){
+  library(profvis)
+  profvis({eval(parse(text=str))})
+}

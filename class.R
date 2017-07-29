@@ -67,6 +67,8 @@ setClass("CWmPrediction",
            stage_dev_rate="numeric",
            stage_ec_rate="numeric",
            photo_resp_rate="numeric",
+           vern_eff="numeric",
+           vern_cum_day="numeric",
            vern_resp_rate="numeric",
            fl="numeric",
            leave_prim="numeric",
@@ -88,18 +90,18 @@ setClass("CWmPrediction",
 #' @slot temp_base numeric. 
 #' @slot p9 numeric. 
 #' @slot phyllochron numeric. 
-#' @slot p1d numeric. Photoperiod sensitivity coeff. %/10h
+#' @slot p1d numeric. Photoperiod sensitivity coeff. [0-3] %/10h
 #' @slot p1dt numeric.  Photoperiod threshold          h
-#' @slot p1v numeric.    Vernalization requirement      d
+#' @slot p1v numeric.    Vernalization requirement   [0-8]   d
 #' @slot p1vd numeric.    Sufficient Vernalization total      d
 #' @slot plastochron numeric. 
 #' @slot gs_flp numeric. 
 #' @slot t_sum_internode numeric. 
 #' @slot ph39 numeric. 
-#' @slot p5 numeric. 
-#' @slot s1_therm_day numeric. 
-#' @slot s4_therm_day numeric. 
-#' @slot s6_therm_day numeric. 
+#' @slot p5 numeric. Value for grain filling [0-8] for hermal time for maturity (TTM)
+#' @slot s1_therm_day numeric. ~400 degree-days termainal spikelet
+#' @slot s4_therm_day numeric. ~200 degree-days ear growth to beginning of grain filling
+#' @slot s6_therm_day numeric. ~250 degree-days from maturity to harvest
 #' @slot leave_prim_init numeric. 
 #' @slot leave_emerg_init numeric. 
 #'

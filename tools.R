@@ -32,6 +32,12 @@ data.add_photo_len<-function(str_weather_file,sheet=NULL){
 #'
 #'Fill up weather dataset with missing data by replacement data
 #'10day forecast < 3day forecast <- actual
+#'
+#' @param problemDF 
+#' @param replacementDF 
+#' @example nafferton2016<-load.weather("./Weather/W_nafferton_2015_2016.xlsx","2016-01-01")
+#' @example S100EA002_2016<-load.weather("./Weather/W_100EA002_2016.xlsx","2016-01-01")
+#' @example nafferton2016<-data.fill_missing_date(nafferton2016,S100EA002_2016)
 data.fill_missing_date <- function(problemDF,replacementDF){
   startDate<-problemDF$date[1]
   endDate<-problemDF$date[nrow(problemDF)]

@@ -21,6 +21,7 @@
 #' @export
 #'
 #' @examples cwm.main("weather.xlsx","CWM_Properties.xlsx", "out8.xlsx",1,"2016-02-01")
+#' naffertonSimDF=cwm.main(weather_data_df = nafferton2016,str_param_file = "./Parameters/CWm_Parameters.xlsx",conf_id = 9,sown_date = "2016-04-17")
 cwm.main <-
   function(str_weather_file,
            str_param_file,
@@ -32,7 +33,6 @@ cwm.main <-
            weather_data_df = NULL,
            end_stage = 99,
            verbose=TRUE) {
-    library(xlsx)
     
     #' initation
     
@@ -48,7 +48,7 @@ cwm.main <-
     ## load Weather data
     if (is.null(weather_data_df)) {
       weather_data <-
-        load_weather(str_weather_file,
+        load.weather(str_weather_file,
                      weather_actual_end = weather_actual_end,
                      start_date = sown_date)
     } else{
@@ -60,25 +60,27 @@ cwm.main <-
     
     # define parameters
     dailyPrediction <- new('CWmPrediction')
-    
-    #dailyPrediction<- init_prediction(dailyPrediction)
     dailyPrediction@stage_dev <- 8
+    dailyPrediction@stage_ec <- 0
     dailyPrediction@leave_prim <- parameters@leave_prim_init
     dailyPrediction@leave_emerg <- parameters@leave_emerg_init
     
-    #' Modelling Loop
-    if(verbose)print(paste("Number available weather days: ", nrow(weather_data)))
-    if(verbose)cat("Start Processing: \n")
     progress <- as.list(nrow(weather_data))
+    
+    #' Modelling Loop
+    if(verbose)print_detail(paste("Number available weather days: ", nrow(weather_data)))
+    if(verbose)print_progress("Start Processing: \n")
+    
     for (i in 1:nrow(weather_data)) {
       weatherRow <- weather_data[i, ]
       ## bind daily weather data
-      dailyWeather <- set_weather(weatherRow, dailyWeather)
+      dailyWeather <- as.Weather(weatherRow, dailyWeather)
       ## process the model
-      dailyPrediction@day <- i
+      dailyPrediction@day <- i-1
       dailyPrediction@date <- dailyWeather@date
-      dailyPrediction <-
-        cwm.process(dailyPrediction, parameters, dailyWeather)
+      if(i>1)
+        dailyPrediction <-
+          cwm.process(dailyPrediction, parameters, dailyWeather)
       
       ##Log result
       dailyPrediction@weather_source <- dailyWeather@source
@@ -89,7 +91,7 @@ cwm.main <-
       # }
       progress[[i]] <- dailyPrediction
       
-      if(verbose)print(
+      if(verbose)print_detail(
         paste(
           "Day ",
           i,
@@ -110,9 +112,9 @@ cwm.main <-
     
     #' Output handling
     if (!is.null(str_outfile))
-      writeResult(str_outfile, resultDF, parameters)
+      writeResult(paste("./output/CWm",weather_data[1,]$site,str_outfile,sep = "_"), resultDF, parameters)
     #write.xlsx(resultDF,file=str_outfile,append=TRUE)
-    if(verbose)print(paste("Row processed: ", i))
+    if(verbose)print_progress(paste("Row processed: ", i))
     return(resultDF)
     ## close infile
     ## close outfile
@@ -148,6 +150,10 @@ cwm.process<-function(dailyPrediction,parameters,dailyWeather){
 }
 
 cwm.f_s8<-function(dailyPrediction,parameters,dailyWeather){
+  #cumulate vernalization
+  dailyPrediction<-cwm.f_vern(dailyPrediction,parameters,dailyWeather)
+  
+  #calculate rates
   stage_dev_rate<-max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@p9
   stage_dev<-dailyPrediction@stage_dev+stage_dev_rate
   
@@ -282,12 +288,41 @@ cwm.f_s6<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction@stage_ec<-stage_ec
   return(dailyPrediction)
 }
-#'
-#'Ritchis 1991
-#'RDR = 1 - k(50 - V); P1V = K * 183 - 0.55; useful scale 0-8
 
+#' function to handle vernalization
+#' cumulate Vernalization days from germination
+#' Ritchie 1991
+#' RDR = 1 - k(50 - V); P1V = K * 183 - 0.55; useful scale 0-8
+#'
+#' @param dailyPrediction 
+#' @param parameters 
+#' @param dailyWeather 
 cwm.f_vern<-function(dailyPrediction,parameters,dailyWeather){
-  dailyPrediction@vern_resp_rate<- 1-((parameters@p1v+0.55)/183)*(parameters@p1vd-dailyWeather@temp_avg)
+  # values ref. Ritchie 1991
+  v_opt_min=0
+  v_opt_max=7
+  v_max=18
+  v_dever_temp=30 
+  v_dever_day=10
+  v_dever_rate=0.5
+  
+  if(dailyPrediction@stage_dev_rate<2 && dailyPrediction@vern_resp_rate<1){ #before anthesis and vernalization not fulfil yet
+    # calculate Relative Vernalization Effectiveness, vernalization days
+    if(dailyWeather@temp_avg<v_opt_min ) dailyPrediction@vern_eff<-0
+    else if( dailyWeather@temp_avg<=v_opt_max) dailyPrediction@vern_eff<-1
+    else if(dailyWeather@temp_avg<=v_max)dailyPrediction@vern_eff<-(dailyWeather@temp_avg-v_opt_max)/(v_max-v_opt_max)
+    else dailyPrediction@vern_eff<-0
+    
+    #devernalization
+    if(dailyWeather@temp_avg>v_dever_temp && dailyPrediction@vern_cum_day<v_dever_day)dailyPrediction@vern_eff<-(dailyWeather@temp_avg-v_dever_temp)*v_dever_rate
+    
+    dailyPrediction@vern_cum_day<-min(parameters@p1vd, max(0,dailyPrediction@vern_cum_day+dailyPrediction@vern_eff)) #0 < vd <= p1dv 
+  }
+  #vernalization rate calucation only required between GS 1-2
+  if(dailyPrediction@stage_dev_rate>0 && dailyPrediction@stage_dev_rate<2){ 
+    # parameters@p1vd>=dailyPrediction@vern_cum_day
+    dailyPrediction@vern_resp_rate<- 1-((parameters@p1v+0.55)/183)*(parameters@p1vd-dailyPrediction@vern_cum_day)
+  }
   return(dailyPrediction)
 }
 
