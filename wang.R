@@ -21,7 +21,7 @@
 #' @export
 #'
 #' @examples wang.main("weather.xlsx","Properties.xlsx", "out8.xlsx",1,"2016-02-01")
-#' @examples wang_result=wang.main("onfarm_weather.xlsx","Wang_Properties.xlsx", conf_id = 2, sown_date = "2017-03-21")
+#' @examples wang.main("./Weather/W_100EA002_2016.xlsx","./Parameters/Wang_Parameters.xlsx", str_outfile="out8.xlsx",conf_id=4,sown_date="2016-04-21")
 wang.main <-
   function(str_weather_file,
            str_param_file,
@@ -246,7 +246,7 @@ wang.f_photo_resp <-function(dailyPrediction,parameters,dailyWeather){
     omega<-dailyPrediction@omega
   }
   
-  photo_resp_rate<-1-exp(-parameters@photo_sig*omega*(dailyWeather@photo_len-parameters@photo_crit))
+  photo_resp_rate<-min(1,max(0,1-exp(-parameters@photo_sig*omega*(dailyWeather@photo_len-parameters@photo_crit))))
   
   dailyPrediction@omega<-omega
   dailyPrediction@photo_resp_rate <-photo_resp_rate

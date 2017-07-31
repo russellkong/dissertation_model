@@ -145,6 +145,58 @@ analysis.obsDay.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
   return(obsDF)
 }
 
+analysis.gs.err.rmse <- function(obsDF,simDF,start_stage=0,end_stage=99) {
+  day_err_df<-analysis.gs.err(simDF=simDF,obsDF=obsDF,start_stage=start_stage,end_stage=end_stage)
+  errList<-c()
+  for(i in 1:nrow(day_err_df)){
+    obs_row <- day_err_df[i,]
+    
+    #skip sown date record and perform range selection
+    if(obs_row$stage_ec==0||obs_row$stage_ec<start_stage||obs_row$day==0)next
+    # perform range selection
+    if(obs_row$stage_ec>end_stage)break
+    
+    errList<-append(errList,obs_row$err)
+  }
+  rmse<-sqrt(mean(errList^2))
+  return(rmse)
+}
+analysis.gs.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
+  #day_err_df<-c()
+  #mode 1: single stage
+  # measured_stage <- measured_set[1,"stage_ec"]
+  # result<-subset(resultDF,stage_ec>=measured_stage & stage_ec<measured_stage+1)
+  # rmse<-(measured_set[1,"day"]-mean(result$day))^2
+  # rmse_array<-append(rmse_array,rmse)
+  #mode 2: multiple stages
+  
+  #init err column
+  obsDF$err<-NA 
+  
+  for(i in 1:nrow(obsDF)){
+    obs_row <- obsDF[i,]
+    
+    #skip sown date record and perform range selection
+    if(obs_row$stage_ec==0||obs_row$stage_ec<start_stage||obs_row$day==0)next
+    
+    # perform range selection
+    if(obs_row$stage_ec>end_stage)break
+    
+    result<-filter(simDF,day==obs_row$day)
+    if(nrow(result)==0){
+        #case 1: day unreachable
+        # keep it inf? use the last available day?
+        result<-tail(simDF,1)
+    }
+    # If the date range of the simulated result of a stage is not containing the measured day, count error
+    error<-0
+    error <- result$stage_ec-obs_row$stage_ec
+    
+    obsDF[i,"err"]<-error
+    #day_err_df<-append(day_err_df,error)
+  }
+  return(obsDF)
+}
 #'--------------------------------------------------------
 #' B. Sim(measured), sim(forecast)
 #' C. Sim(measured_photo), sim(calculated_photo)

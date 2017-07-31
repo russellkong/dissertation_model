@@ -176,10 +176,8 @@ cwm.f_s9<-function(dailyPrediction,parameters,dailyWeather){
 
 cwm.f_s1<-function(dailyPrediction,parameters,dailyWeather){
   #P.64 accumulation of leave formation temperature start from emerge
-  leave_prim<-dailyPrediction@leave_prim+max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@plastochron
-  leave_emerg<-dailyPrediction@leave_emerg+max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@phyllochron
-  dailyPrediction@leave_prim<-leave_prim
-  dailyPrediction@leave_emerg<-leave_emerg
+  dailyPrediction<-cwm.f_leave(dailyPrediction,parameters,dailyWeather)
+  
   
   dailyPrediction<-cwm.f_vern(dailyPrediction,parameters,dailyWeather)
   dailyPrediction<-cwm.f_photo(dailyPrediction,parameters,dailyWeather)
@@ -202,27 +200,35 @@ cwm.f_s1<-function(dailyPrediction,parameters,dailyWeather){
   
   return(dailyPrediction)
 }
+cwm.f_leave<-function(dailyPrediction,parameters,dailyWeather){
+  #end of leaf primordia formation
+  if(dailyPrediction@stage_dev < parameters@gs_flp){
+    dailyPrediction@leave_prim<-dailyPrediction@leave_prim+max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@plastochron
+  }
+  
+  dailyPrediction@leave_emerg<-dailyPrediction@leave_emerg+max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@phyllochron
+  
+  #define fl value at GS=2
+  if(dailyPrediction@stage_dev>=2 && dailyPrediction@fl==0)
+    dailyPrediction@fl<-dailyPrediction@leave_prim-2-dailyPrediction@leave_emerg
+  
+  return(dailyPrediction)
+}
 cwm.f_s2<-function(dailyPrediction,parameters,dailyWeather){
   #stage_dev_rate<-(max(0,dailyWeather@temp_avg-parameters@temp_base) * (3*parameters@phyllochron) #CW original
-  leave_prim<-dailyPrediction@leave_prim+max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@plastochron
-  leave_emerg<-dailyPrediction@leave_emerg+max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@phyllochron
-  fl<-leave_prim-2-leave_emerg
+  dailyPrediction<-cwm.f_leave(dailyPrediction,parameters,dailyWeather)
   
-  stage_dev_rate<-(max(0,dailyWeather@temp_avg-parameters@temp_base)) / (fl*parameters@phyllochron+parameters@ph39)
+  stage_dev_rate<-(max(0,dailyWeather@temp_avg-parameters@temp_base)) / (dailyPrediction@fl*parameters@phyllochron+parameters@ph39)
   stage_dev<-dailyPrediction@stage_dev+stage_dev_rate
   
   stage_ec<-dailyPrediction@stage_ec
-  if(leave_prim-2<leave_emerg){
+  if(dailyPrediction@leave_prim-2<dailyPrediction@leave_emerg){
     if(dailyPrediction@stage_ec<37) stage_ec<-37
     stage_ec_rate<-min(2*max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@ph39,40-stage_ec)
   }else{
     stage_ec_rate<-max(0,dailyWeather@temp_avg-parameters@temp_base)/parameters@t_sum_internode
   }
   stage_ec<-max(30,stage_ec+stage_ec_rate)
-  
-  dailyPrediction@leave_prim<-leave_prim
-  dailyPrediction@leave_emerg<-leave_emerg
-  dailyPrediction@fl<-fl
   
   dailyPrediction@stage_dev_rate<-stage_dev_rate
   dailyPrediction@stage_dev<-stage_dev

@@ -79,7 +79,9 @@ plot.Sim_Obs <- function(obsDF,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NUL
  
   rs2<-gather(rs1, sources,sim_ec,-c(day,obs_ec))
   print("lm")
-  print(lm(sim_ec~obs_ec,data=rs2))
+  lm.rs<-lm(sim_ec~obs_ec,data=rs2)
+  print(summary(lm.rs))
+  #print(plot(lm.rs,las=1))
   
   p2<-ggplot(rs2, aes(x=obs_ec,y=sim_ec))+
     geom_point(shape=18,size=4)+
@@ -140,16 +142,17 @@ plot.wang.gradient<-function(str_weather_files,
 }
 
 plot.cwm.gradient<-function(){
-  prepare.data( c("./Weather/W_100EA002_2016.xlsx"),c("./Phenology/P_WindsorWest_2016.xlsx"))
+  list_weather_data<-load.weather.data(c("./Weather/W_100EA002_2016.xlsx"))
+  list_measured_data<-load.phenology.data(c("./Phenology/P_WindsorWest_2016.xlsx"))
   
   #load parameters
   parameters_def <- new('CWmParameterSet')
-  parameters_def <- cwm.set_param("./Parameters/CWm_Parameters.xlsx", parameters_def, 10)
+  parameters_def <- cwm.set_param("./Parameters/CWm_Parameters.xlsx", parameters_def, 9)
   
-  x<-seq(40, 70, length=10)
-  y<-seq(80, 110, length=10)
-  param_opti<-c("t_sum_internode","ph39")
-  end_stage<-57
+  x<-seq(11, 46, length=10)
+  y<-seq(1, 2, length=10)
+  param_opti<-c("plastochron", "gs_flp")#c("t_sum_internode","ph39")
+  end_stage<-40
   
   f<-plot.wapper.cwm.rmse
   z<-outer(x,y,Vectorize(f), param_custom_opti=param_opti, list_weather_data=list_weather_data,  param_def=parameters_def, list_measured_data=list_measured_data, end_stage=end_stage,retain_rs=FALSE)
@@ -162,14 +165,15 @@ plot.cwm.gradient<-function(){
   color<-jet.colors(nbcol)
   zfacet<-z[-1,-1]+z[-1,-ncz]+z[-nrz,-1]+z[-nrz,-ncz]
   facetcol<-cut(zfacet,nbcol)
-  print(persp(x,y,z,col=color[facetcol],phi=20,theta=30,
+  print(persp(x,y,z,col=color[facetcol],phi=50,theta=80,
               ticktype="detailed",d=5,r=1,shade=0.1,expand=0.6 ) )
   
   print(which(z==min(z),arr.ind = TRUE))
+  return(list(x=x,y=y,z=z))
 }
 plot.wapper.wang.rmse<-function(x,y, ...){
-  return(wang.rmse(param_custom = c(x,y),...))
+  return(calibrate.wang.rmse(param_custom = c(x,y),...))
 }
 plot.wapper.cwm.rmse<-function(x,y, ...){
-  return(cwm.rmse(param_custom = c(x,y),...))
+  return(calibrate.cwm.rmse(param_custom = c(x,y),...))
 }
