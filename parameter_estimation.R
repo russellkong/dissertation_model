@@ -329,9 +329,8 @@ calibrate.optim <- function(par, fn, lower, upper,parscale,param_custom_opti,lis
   
   ##only show plot of first site, checking
   #print(plot.Sim_Obs(PE.resultObj.working$resultDF[[1]][[1]],list_measured_data[[1]]))
-  i=length(PE.resultObj.working$resultDF)
   #for(i in 1:length(PE.resultObj.working$resultDF)){
-  print(plot.Sim_Obs(simDFs=list(PE.resultObj.working$resultDF[[1]][[1]],PE.resultObj.working$resultDF[[i]][[1]]),simDFs_leg = list("start","end"),obsDF=list_measured_data[[1]],title=paste(param_custom_opti,collapse = ",")))
+  print(plot.Sim_Obs(simDFs=list(PE.resultObj.working.mi$resultDF[["start"]][[1]],PE.resultObj.working$resultDF[["end"]][[1]]),simDFs_leg = list("start","end"),obsDF=list_measured_data[[1]],title=paste(param_custom_opti,collapse = ",")))
   #}
   
   return(OLS)
@@ -416,6 +415,9 @@ calibrate.wang.rmse <- function(...){
   return(calibrate.rmse(modelFUN=wang.main, paramFUN=wang.param.replace, ...))
 }
 
+#'
+#'Calculate error distance between obs and sim data
+#'factors: minimum days of appearence + stage deviation on observaed day (weight = 1:1)
 calibrate.rmse <-function(modelFUN,paramFUN,param_custom, param_custom_opti,list_weather_data,param_def, list_measured_data, end_stage, retain_rs=TRUE,low, up){
   if(any(param_custom<low) %in% TRUE) return(Inf)
   if(any(param_custom>up) %in% TRUE) return(Inf)
@@ -447,12 +449,12 @@ calibrate.rmse <-function(modelFUN,paramFUN,param_custom, param_custom_opti,list
   print_detail(paste("[",PE.iteration,"]",paste(param_custom_opti,collapse = "|"),"=",paste(param_custom,collapse = "|"),"[ RMSE_Day=",rmse_day," RMSE_GS=",rmse_gs,"]"))
   
   if(retain_rs){
-    
+    i<-ifelse(PE.iteration==1,"start","end")
     if(!exists("PE.resultObj.working")) PE.resultObj.working<<-list()
-    PE.resultObj.working$param_custom_opti[[PE.iteration]]<<-param_custom_opti
-    PE.resultObj.working$param_custom[[PE.iteration]]<<-param_custom
-    PE.resultObj.working$RMSE[PE.iteration]<<-list(day=rmse_day,gs=rmse_gs)
-    PE.resultObj.working$resultDF[[PE.iteration]]<<-resultDF
+    PE.resultObj.working$param_custom_opti[[i]]<<-param_custom_opti
+    PE.resultObj.working$param_custom[[i]]<<-param_custom
+    PE.resultObj.working$RMSE[i]<<-list(day=rmse_day,gs=rmse_gs)
+    PE.resultObj.working$resultDF[[i]]<<-resultDF
   }
   return(rmse_day+rmse_gs)
 }

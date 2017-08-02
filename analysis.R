@@ -78,7 +78,7 @@ analysis.photo.err <- function(){
 #' ===========================================================
 #' A. Obs to sim(measured)
 #' -----------------------------------------------------------
-#' Calculate RMSE between a simulated result set to observed data
+#' Calculate RMSE of min. days difference between a simulated result set to observed data
 #' Input of start_stage and end_stage as control for phasic analysis
 #'
 #' @param simDF 
@@ -145,6 +145,9 @@ analysis.obsDay.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
   return(obsDF)
 }
 
+
+#' Calculate RMSE of stage difference between a simulated result set to observed data on the observed day.
+#' Input of start_stage and end_stage as boundary for phasic analysis
 analysis.gs.err.rmse <- function(obsDF,simDF,start_stage=0,end_stage=99) {
   day_err_df<-analysis.gs.err(simDF=simDF,obsDF=obsDF,start_stage=start_stage,end_stage=end_stage)
   errList<-c()
@@ -162,14 +165,7 @@ analysis.gs.err.rmse <- function(obsDF,simDF,start_stage=0,end_stage=99) {
   return(rmse)
 }
 analysis.gs.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
-  #day_err_df<-c()
-  #mode 1: single stage
-  # measured_stage <- measured_set[1,"stage_ec"]
-  # result<-subset(resultDF,stage_ec>=measured_stage & stage_ec<measured_stage+1)
-  # rmse<-(measured_set[1,"day"]-mean(result$day))^2
-  # rmse_array<-append(rmse_array,rmse)
-  #mode 2: multiple stages
-  
+
   #init err column
   obsDF$err<-NA 
   

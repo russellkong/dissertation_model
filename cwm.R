@@ -76,7 +76,7 @@ cwm.main <-
       ## bind daily weather data
       dailyWeather <- as.Weather(weatherRow, dailyWeather)
       ## process the model
-      dailyPrediction@day <- i-1
+      dailyPrediction@day <- i - 1
       dailyPrediction@date <- dailyWeather@date
       if(i>1)
         dailyPrediction <-

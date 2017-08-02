@@ -1,3 +1,115 @@
+setClass(
+  "Weather",
+  representation(
+    date = "POSIXct",
+    temp_avg = "numeric",
+    temp_min = "numeric",
+    temp_max = "numeric",
+    photo_len = "numeric",
+    source = "character"
+  )
+)
+
+setMethod("as.data.frame", "Weather",
+          function(x,
+                   row.names = NULL,
+                   optional = FALSE,
+                   ...) {
+            slotnames <- slotNames(x)
+            slotlist <-
+              data.frame(rbind(replicate(length(slotnames), 0)))
+            names(slotlist) <- slotnames
+            for (i in slotnames) {
+              if (length(slot(x,  i)) > 0) {
+                if (is(slot(x,  i), "POSIXct")) {
+                  slotlist[1, i] <-
+                    as.character(slot(x,  i))
+                }
+                else {
+                  slotlist[1, i] <- slot(x,  i)
+                }
+              }
+            }
+            return(slotlist)
+          })
+setClass(
+  "Prediction",
+  representation(
+    day = "numeric",
+    date = "POSIXct",
+    stage_dev = "numeric",
+    stage_ec = "numeric",
+    weather_source = "character"
+  )
+)
+
+#' Title
+#'
+#' @param Prediction
+#'
+#' @return
+#' @export
+#'
+#' @examples
+setMethod("as.data.frame", "Prediction",
+          function(x,
+                   row.names = NULL,
+                   optional = FALSE,
+                   ...) {
+            slotnames <- slotNames(x)
+            slotlist <-
+              data.frame(rbind(replicate(length(slotnames), 0)))
+            names(slotlist) <- slotnames
+            for (i in slotnames) {
+              if (length(slot(x,  i)) > 0) {
+                if (is(slot(x,  i), "POSIXct")) {
+                  slotlist[1, i] <-
+                    as.character(slot(x,  i))
+                }
+                else {
+                  slotlist[1, i] <- slot(x,  i)
+                }
+              }
+            }
+            return(slotlist)
+          })
+
+
+#' Title
+#'
+#' @slot id numeric. 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+setClass("ParameterSet",
+         representation(conf_id = "numeric", model="character", weather_file="character"))
+
+setMethod("as.data.frame", "ParameterSet",
+          function(x,
+                   row.names = NULL,
+                   optional = FALSE,
+                   ...) {
+            slotnames <- slotNames(x)
+            slotlist <-
+              data.frame(rbind(replicate(length(slotnames), 0)))
+            names(slotlist) <- slotnames
+            for (i in slotnames) {
+              if (length(slot(x,  i)) > 0) {
+                if (is(slot(x,  i), "POSIXct")) {
+                  slotlist[1, i] <-
+                    as.character(slot(x,  i))
+                }else if (is(slot(x,  i), "data.frame")) {
+                  slotlist[1, i] <- paste(as.character(slot(x,  i)),collapse = "|")
+                } else {
+                  slotlist[1, i] <- slot(x,  i)
+                }
+              }
+            }
+            return(slotlist)
+          })
+
 
 setClass("WangPrediction",
          representation(
