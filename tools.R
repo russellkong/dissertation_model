@@ -10,7 +10,9 @@
 #' @export
 #'
 #' @examples
-data.add_photo_len<-function(str_weather_file,sheet=NULL){
+data.add_photo_len.xlsx<-function(str_weather_file,sheet=NULL){
+  library(readxl)
+  library(xlsx)
   
   sheets <- excel_sheets(str_weather_file)
   if (!is.null(sheet) && sheet %in% sheets) {
@@ -18,17 +20,24 @@ data.add_photo_len<-function(str_weather_file,sheet=NULL){
   }else{
     weather_data <- read_excel(str_weather_file, sheet = 1)
   }
+  weather_data<-data.add_photo_len(weather_data)
   
+  write.xlsx(weather_data,file=str_weather_file,append=TRUE,sheetName = "OUTPUT")
+}
+data.add_photo_len<-function(weatherDF, lat=NULL){
+  library(readxl)
+  library(geosphere)
   #lookup lat of the weather station
-  ws_loc <- read_excel(str_mapping_table,sheet="WeatherStation_Location");
-  lat<-ws_loc$lac[ws_loc$weather_station==weather_data$site[1]]
+  if(is.null(lat)){
+    ws_loc <- read_excel(str_mapping_table,sheet="WeatherStation_Location");
+    lat<-ws_loc$lac[ws_loc$weather_station==weatherDF$site[1]]
+  }
   
   if(length(lat)==0)stop("Site's location not found in Mapping table",str_mapping_table)
   
-  weather_data$photo_len <- daylength(lat,as.character(weather_data$date))
-  write.xlsx(weather_data,file=str_weather_file,append=TRUE,sheetName = "OUTPUT")
+  weatherDF$photo_len <- daylength(lat,as.character(weatherDF$date))
+  return(weatherDF)
 }
-
 #'
 #'Fill up weather dataset with missing data by replacement data
 #'10day forecast < 3day forecast <- actual

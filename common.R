@@ -136,6 +136,53 @@ load.phenology.data<-function(str_measured_files){
   
 }
 
+#' Extract 150 days weather data from weather file for each phenology observation season
+#' Purpose: performance workaround for the slow filter and data.table subset behaviour
+#'
+#' @param stdPhenology[['site']](date,stage_ec,...)
+#' @param stdWeather[['weather_station_id']]{site,date,...}
+#'
+#' @return No return
+#' @export PE.phenoWeather[['weather_station_id']][['sown_date']] - Global object
+#'
+#' @examples
+load.phenoWeather.data<-function(stdPhenology,stdWeather){
+  #Preload all weather files
+  PE.weatherDT<<-lapply(FUN=as.data.table,stdWeather) #performance handling
+  PE.weatherDT<<-lapply(FUN=setindex,PE.weatherDT,"date")
+  #Preload all measured data
+  PE.phenologyDT<<-lapply(FUN=as.data.table,stdPhenology) #performance handling
+  
+  if(!exists("PE.pheoWeatherDT"))PE.pheoWeatherDT<<-list()
+  list_sites<-names(PE.phenologyDT)
+  for(i in 1:length(list_sites)){
+    site<-as.character(list_sites[i])
+    siteObsDT<-PE.phenologyDT[[site]]
+    list_years<-unique(sapply(FUN=year,siteObsDT[,'date']))
+    
+    for(j in 1:length(list_years)){
+      yr<-as.character(list_years[j])
+      print_progress(paste("Start process site ",site," for year ",yr))
+      
+      #seasonObsDF<-filter(siteObsDF, year==list_years[[j]])
+      seasonObsDT<-siteObsDT[year==list_years[[j]]]
+      weather_station<-as.character(seasonObsDT$site[[1]])
+      print_detail(paste("Weather station :",weather_station))
+      
+      sown_date<-as.Date(seasonObsDT$date[seasonObsDT$stage_ec==0])
+      print_detail(paste("Sown date :",sown_date))
+      if(length(sown_date)==0){
+        print_critical(paste("skipped a dataset : sown date absence"))
+        next
+      }
+      if(!weather_station %in% names(PE.pheoWeatherDT)) PE.pheoWeatherDT[[weather_station]]<-list()
+      if(!sown_date %in% names(PE.pheoWeatherDT[[weather_station]])){
+        PE.pheoWeatherDT[[weather_station]][[as.character(sown_date)]]<<-
+          try(PE.weatherDT[[weather_station]][date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(150)])
+      }
+    }
+  }
+}
 writeResult<-function(str_outfile,result,parameters){
   write.xlsx(as.data.frame(parameters),file=str_outfile,append=TRUE,sheetName = "Parameters")
   write.xlsx(result,file=str_outfile,append=TRUE,sheetName = "Result")
@@ -204,13 +251,15 @@ next_ec<-function(stage_ec){
 #' @examples
 lookup.weather_station<-function(site){
   if(!exists("LU.site_station_table"))LU.site_station_table<<-read_excel(str_mapping_table,sheet="Site_WeatherStation");
-  site_station<-LU.site_station_table$weather_station[LU.site_station_table$site==site]
+  site_station<-as.character(LU.site_station_table$weather_station[LU.site_station_table$site==site])
   if(length(site_station)==0){
-    stop("No weather station mapped to the site in Mapping file",str_mapping_table)
-    remove(LU.site_station_table)
+    warning("No weather station mapped to the site in Mapping file",str_mapping_table)
+    site_station<-site
+    #remove(LU.site_station_table)
   }else if(length(site_station)>1){
     warning("More than one weather station mapped to the site in Mapping file",str_mapping_table)
-    remove(LU.site_station_table)
+    #remove(LU.site_station_table)
+    site_station<-site
   }
   return(site_station)
 }

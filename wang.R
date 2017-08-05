@@ -51,7 +51,7 @@ wang.main <-
                      weather_actual_end = weather_actual_end,
                      start_date = sown_date)
     }else{
-      weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date))
+      weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365))
     }
     
     ## init variables
