@@ -19,23 +19,37 @@ install_pkg<-function(){
   install.packages("foreach")
   install.packages("lubridate")
   install.packages("data.table")
+  install.packages("doSNOW")
 }
 set_parallel_env<-function(){
   library(doParallel)
+  library(doSNOW)
   library(foreach)
   
-  cl <- makeCluster(detectCores()-1)
-  registerDoParallel(cl)
+  cl<-makeCluster(detectCores(),outfile="./parConsoleOutput.txt") #change the 2 to your number of CPU cores
+  
+  registerDoSNOW(cl)
+}
+end_parallel_env<-function(){
+  stopCluster(cl)
+}
+load.debugsource<-function(){
+  debugSource("~/dissertation_model/class.R")
+  debugSource("~/dissertation_model/common.R")
+  debugSource("~/dissertation_model/wang.R")
+  debugSource("~/dissertation_model/cwm.R")
+  debugSource("~/dissertation_model/analysis.R")
+  debugSource("~/dissertation_model/plot.R")
+  debugSource("~/dissertation_model/tools.R")
+  debugSource("~/dissertation_model/parameter_estimation.R")
 }
 init_env<-function(){
   library(readxl)
   library(xlsx)
   library(dplyr)
   library(tidyr)
-  library(ggplot2)
-  library(lubridate)
-  library(geosphere)
   library(data.table)
+  
   setwd('~/dissertation_model')
   source("class.R")
   source("common.R")
@@ -54,12 +68,19 @@ init_env<-function(){
   available_stages<<-c(0,1,3,5,7,9,10:37,39,41,43,45,49,51,53,55,57,59,61,65,69,71,73,75,77,83,85,87,91:99)
   
   #varbose output level 1(keypoint),3(progress),5(detail),9(debug)
-  print_level<<-1
+  print_level<<-3
   
   setwd('~/dissertation_data')
   
+  stdWeatherDT<<-readRDS("./Weather/formatedSiteWeather.rds")
+  stdPhenoWeatherDT<<-readRDS("./Weather/filteredPhenoWeather.rds")
+  stdPhenologyDT<<-readRDS("./Phenology/formatedPhenology.rds")
 }
 
+compile_fun<-function(){
+  library(compiler)
+  enableJIT(2)
+}
 clear_env<-function(){
   #common.R:lookup.weather_station
   remove(LU.site_station_table)
@@ -84,44 +105,33 @@ load_prof <-function(str){
   profvis({eval(parse(text=str))})
 }
 
-test<-function(){
-  soiltempMeta<-readRDS("./Malte/soilTempMeta.rds")
-  weatherMeta<-readRDS("./Malte/weatherDataMeta.rds")
-  phenologyData<-readRDS("./Malte/pheFilteredListReduced.rds")
-  soiltempData<-readRDS("./Weather/raw/soilTempData.rds")
-  weatherData<-readRDS(("./Weather/raw/weatherDatareduced.rds"))
-  # filter phenology data [only spring barley]
-  sbPheData<-phenologyData[['207']][['annual']]
-  stdWeatherDF<-data.weather.germany(weatherData)
-  stdPhenologyDF<-data.phenology.germany(phenologyData)
-}
-
-data.weather.germany<-function(weatherData){
-  return(lapply(FUN=data.weather.preprocess.germany,weatherData))
-}
-data.weather.preprocess.germany<-function(siteWeatherData){
-  library(dplyr)
-  weatherDF<-select(siteWeatherData$data,STATIONS_ID,MESS_DATUM,SDK,TMK,TXK,TNK)
-  colnames(weatherDF)<-c("site","date","photo_len","temp_avg","temp_max","temp_min")
-  if(any(is.na(weatherDF[,'photo_len']))){
-    weatherDF<-data.add_photo_len(weatherDF,lat=siteWeatherData[['loc']]['LAT'])
-    weatherDF$source<-with(siteWeatherData,"actual_temp;cal_daylength")
-  }else{
-    weatherDF$source<-with(siteWeatherData,"actual_temp;actual_light")
+cwm.eachYearParameter<-function(yearList,optOutSites=NULL){
+  PE.modelExecutionCount<<-0
+  avaDF=read_excel('./AvailablePhenologySeason.xlsx',sheet="Sheet1")
+  list_ava_years<-as.list(unique(avaDF[,'year']))$year
+  for(i in 1:length(list_ava_years)){
+    year=list_ava_years[i]
+    if(year %in% yearList){
+      print(paste("Process year ",year))
+      cwm_par<-cwm.calibrate(str_param_file = "./Parameters/CWm_Parameters.xlsx",
+                     list_site_weather = stdWeatherDT, list_site_phenology = stdPhenologyDT, conf_id=10,
+                     start_year = year,end_year = year,optOutSites = optOutSites)
+      saveRDS(cwm_par,paste('./Parameters/cwmCalParHistYr',as.character(year),'.rds',sep = ""))
+    }
   }
-  return(weatherDF)
 }
-data.phenology.germany<-function(phenologyData){
-  return(lapply(FUN=data.data.phenology.preprocess.germany,phenologyData$`207`$annual))
+wang.eachYearParameter<-function(yearList,optOutSites=NULL){
+  PE.modelExecutionCount<<-0
+  avaDF=read_excel('./AvailablePhenologySeason.xlsx',sheet="Sheet1")
+  list_ava_years<-as.list(unique(avaDF[,'year']))$year
+  for(i in 1:length(list_ava_years)){
+    year=list_ava_years[i]
+    if(year %in% yearList){
+      print(paste("Process year ",year))
+      wang_par<-wang.calibrate(str_param_file = "./Parameters/Wang_Parameters.xlsx",
+                                        list_site_weather = stdWeatherDT, list_site_phenology = stdPhenologyDT, conf_id=3,
+                                        start_year = year,end_year = year,optOutSites = optOutSites)
+      saveRDS(wang_par,paste('./Parameters/wangCalParHistYr',as.character(year),'.rds',sep = ""))
+    }
+  }
 }
-data.data.phenology.preprocess.germany<-function(sitePhenologyData){
-  phenologyDF<-select(sitePhenologyData$data,WTH_id,HRVYR,DATE,BBCH)
-  phenologyDF<- phenologyDF %>% group_by(HRVYR) %>% mutate(day=as.numeric(difftime(DATE,min(DATE),units="days")))
-  phenologyDF<-ungroup(phenologyDF)
-  colnames(phenologyDF)<-c("site","year","date","stage_ec","day")
-  #"data"      "daterange" "name"      "loc"       "msl"       "weather"   "soilTemp" 
-  #
-  #DATE Phase_id BBCH HRVYR  Periode Qualitaetsniveau Eintrittsdatum_QB WTH_id SLT_id
-  return(phenologyDF)
-}
-phenologyDT = lapply(FUN=as.data.table,stdPhenology)

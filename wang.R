@@ -1,3 +1,7 @@
+library(readxl)
+library(xlsx)
+library(dplyr)
+library(data.table)
 ## Coding of Wang's Small grain cereal phenology model
 ## Author: Russell Kong
 ## Date: 16 JUN 2017
@@ -14,7 +18,7 @@
 #' @param sown_date the start date of simulation 
 #' @param weather_actual_end define end date of actual weather data reading, continue with predicted data
 #' @param parameters_df custom dataframe for parameters. For calibration use. Ignore file location on applied
-#' @param weather_data_df custom dataframe for weather data For calibration use, performance improvement on multiple iteration
+#' @param weather_data_dt custom dataframe for weather data For calibration use, performance improvement on multiple iteration
 
 #'
 #' @return data.frame (result of prediction)
@@ -30,7 +34,7 @@ wang.main <-
            sown_date = NULL,
            weather_actual_end = NULL,
            parameters_df = NULL,
-           weather_data_df = NULL,
+           weather_data_dt = NULL,
            end_stage = 99,verbose=TRUE) {
     
     #' initation
@@ -45,13 +49,14 @@ wang.main <-
     
     
     ## load Weather data
-    if (is.null(weather_data_df)) {
+    if (is.null(weather_data_dt)) {
       weather_data <-
         load.weather(str_weather_file,
                      weather_actual_end = weather_actual_end,
                      start_date = sown_date)
     }else{
-      weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365))
+      #weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365))
+      weather_data <- weather_data_dt[date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365)]
     }
     
     ## init variables
@@ -59,6 +64,7 @@ wang.main <-
     
     # define parameters
     dailyPrediction <- new('WangPrediction')
+    dailyPrediction<-as.data.frame(dailyPrediction)
     dailyPrediction@stage_dev <- -1
     dailyPrediction@stage_ec <- 0
     
@@ -70,7 +76,7 @@ wang.main <-
     for (i in 1:nrow(weather_data)) {
       weatherRow <- weather_data[i,]
       ## bind daily weather data
-      dailyWeather <- as.Weather(weatherRow, dailyWeather)
+      dailyWeather <- weatherRow#as.Weather(weatherRow, dailyWeather)
       ## process the model
       dailyPrediction@day <- i - 1
       dailyPrediction@date <- dailyWeather@date
@@ -106,7 +112,7 @@ wang.main <-
         break
     }
     
-    resultDF<-do.call(rbind,lapply(progress,"as.data.frame"))
+    resultDF<-rbindlist(progress)
     
     #' Output handling
     if (!is.null(str_outfile))

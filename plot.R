@@ -1,4 +1,5 @@
 
+library(ggplot2)
 
 plot.EC <- function(wangDF, cwmDF) {
   rs_wang<- wangDF[,c("day","stage_ec")]

@@ -151,7 +151,8 @@ setClass("WangPrediction",
            node_sum=0,
            till_main_sum=0,
            alpha=0,
-           omega=0
+           omega=0,
+           date=as.POSIXct("1970-01-01")
          ), contains = "Prediction")
 setClass("WangParameterSet",
          representation(
@@ -194,7 +195,8 @@ setClass("CWmPrediction",
            vern_resp_rate=0,
            fl=0,
            leave_prim=4,
-           leave_emerg=1
+           leave_emerg=1,
+           date=as.POSIXct("1970-01-01")
          ), contains = "Prediction")
 
 #' Title

@@ -1,3 +1,4 @@
+library(geosphere)
 
 #' Function to add photo_len column to weather data in excel file
 #' "OUTPUT" sheet created as a copy of orignal weather file with the new col

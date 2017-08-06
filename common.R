@@ -1,4 +1,4 @@
-
+library(data.table)
 
 #' Title
 #'
@@ -106,7 +106,7 @@ load.weather <-
       warning("The weather file has missing date!!! Simulation will be wrong. Please check the file.")
     }
       
-    return(weather_data)
+    return(as.data.table(weather_data))
   }
 
 #' load a list of weather files
@@ -117,9 +117,9 @@ load.weather.data<-function(str_weather_files,...){
   #Preload all weather files
   list_weather_data<-list()
   for(i in 1:length(str_weather_files)){
-    weather_data_df <-
+    weather_data_dt <-
       load.weather(str_weather_files[i],...)
-    list_weather_data[[as.character(weather_data_df$site[1])]]<-weather_data_df
+    list_weather_data[[as.character(weather_data_dt$site[1])]]<-weather_data_dt
   }
   return(list_weather_data)
 }

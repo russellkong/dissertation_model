@@ -111,7 +111,7 @@ analysis.obsDay.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
   #mode 2: multiple stages
   
   #init err column
-  obsDF$err<-NA 
+  obsDF$err<- NA_real_
   
   for(i in 1:nrow(obsDF)){
     obs_row <- obsDF[i,]
@@ -122,7 +122,7 @@ analysis.obsDay.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
     # perform range selection
     if(obs_row$stage_ec>end_stage)break
     
-    result<-filter(simDF,stage_ec>=obs_row$stage_ec & stage_ec<next_ec(obs_row$stage_ec))
+    result<-simDF[stage_ec>=obs_row$stage_ec & stage_ec<next_ec(obs_row$stage_ec)]
     if(nrow(result)==0){
       if(max(simDF$stage_ec)>obs_row$stage_ec){
         #case 1: stage skipped in simulation
@@ -167,7 +167,7 @@ analysis.gs.err.rmse <- function(obsDF,simDF,start_stage=0,end_stage=99) {
 analysis.gs.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
 
   #init err column
-  obsDF$err<-NA 
+  obsDF$err<-NA_real_
   
   for(i in 1:nrow(obsDF)){
     obs_row <- obsDF[i,]
@@ -178,7 +178,7 @@ analysis.gs.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
     # perform range selection
     if(obs_row$stage_ec>end_stage)break
     
-    result<-filter(simDF,day==obs_row$day)
+    result<-simDF[day==obs_row$day]
     if(nrow(result)==0){
         #case 1: day unreachable
         # keep it inf? use the last available day?
