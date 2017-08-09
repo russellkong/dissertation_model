@@ -2,8 +2,8 @@ library(lubridate)
 
 PE.START_YEAR<<-0000
 PE.END_YEAR<<-2017
-PE.SITE_OPT_OUT<<-c('')
-  
+PE.SITE_OPT_OUT<<-c()
+PE.SITE_OPT_IN<<-c()
 #' Model parameter estimation on one dataset
 #'
 #'
@@ -18,9 +18,9 @@ PE.SITE_OPT_OUT<<-c('')
 #' 
 #' @example  cwm.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"),"./Parameters/CWm_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"))
 cwm.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
-                           str_param_file,
+                           str_param_file,parameters_def=NULL,
                            str_measured_files=NULL,list_site_phenology=NULL,
-                           start_year=NULL,end_year=NULL,optOutSites=NULL,
+                           start_year=NULL,end_year=NULL,optOutSites=NULL,optInSites=NULL,
                            str_outfile = NULL,
                            conf_id = 1,
                            weather_actual_end = NULL, trail_start=1,trail_end=NULL,store_rs=FALSE){
@@ -31,7 +31,10 @@ cwm.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
   PE.END_YEAR<<-ifelse(!is.null(end_year),end_year,9999)
   if(!is.null(optOutSites)){
     PE.SITE_OPT_OUT<<-optOutSites
-  } else {PE.SITE_OPT_OUT<<-c("")}
+  } else {PE.SITE_OPT_OUT<<-c()}
+  if(!is.null(optInSites)){
+    PE.SITE_OPT_IN<<-optInSites
+  } else {PE.SITE_OPT_IN<<-c()}
   
   #Preload all weather files
   if(is.null(list_site_weather))
@@ -44,9 +47,10 @@ cwm.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
   PE.phenologyDT<<-lapply(FUN=as.data.table,list_site_phenology) #performance handling
   
   #load parameters
-  parameters_def <- new('CWmParameterSet')
-  parameters_def <- cwm.set_param(str_param_file, parameters_def, conf_id)
-  
+  if(is.null(parameters_def)){
+    parameters_def <- new('CWmParameterSet')
+    parameters_def <- cwm.set_param(str_param_file, parameters_def, conf_id)
+  }
   if(!exists("PE.pheoWeatherDT"))
     load.phenoWeather.data(stdPhenology = PE.phenologyDT,stdWeather = PE.weatherDT)
   
@@ -173,7 +177,7 @@ cwm.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
 wang.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
                            str_param_file,
                            str_measured_files,list_site_phenology=NULL,
-                           start_year=NULL,end_year=NULL,optOutSites=NULL,
+                           start_year=NULL,end_year=NULL,optOutSites=NULL,optInSites=NULL,
                            str_outfile = NULL,
                            conf_id = 1,
                            weather_actual_end = NULL, trail_start=1,trail_end=NULL,store_rs=FALSE){
@@ -185,6 +189,9 @@ wang.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
   if(!is.null(optOutSites)){
     PE.SITE_OPT_OUT<<-optOutSites
   } else {PE.SITE_OPT_OUT<<-c("")}
+  if(!is.null(optInSites)){
+    PE.SITE_OPT_IN<<-optInSites
+  } else {PE.SITE_OPT_IN<<-c()}
   
   #Preload all weather files
   if(is.null(list_site_weather))
@@ -308,19 +315,19 @@ calibrate.optim <- function(par, fn, lower, upper,parscale,param_custom_opti,par
   print_progress(paste("start low: ",paste(curpar,collapse = "|")))
   PE.iteration<<-0
   PE.resultObj.working<<-list()
-  if(length(par)>1){
-      OLS_lo <- try(optim(par=curpar, 
+  # if(length(par)>1){
+      OLS_lo <- optim(par=curpar, 
               fn=fn, method="Nelder-Mead", control = list(parscale=parscale, maxit=100),
               param_custom_opti=param_custom_opti,param_def=param_def,
               end_stage=end_stage,low = lower, up = upper,
-              store_rs=store_rs))
-  }else{
-    OLS_lo <- try(optim(par=curpar, 
-              fn=fn, method="L-BFGS-B", control = list(parscale=parscale, maxit=100),
-              param_custom_opti=param_custom_opti,param_def=param_def,
-              end_stage=end_stage,low = lower, up = upper,lower = lower, upper = upper,
-              store_rs=store_rs))
-  }
+              store_rs=store_rs)
+  # }else{
+  #   OLS_lo <- optim(par=curpar, 
+  #             fn=fn, method="L-BFGS-B", control = list(parscale=parscale, maxit=100, trace=2),
+  #             param_custom_opti=param_custom_opti,param_def=param_def,
+  #             end_stage=end_stage,low = lower, up = upper,lower = lower, upper = upper,
+  #             store_rs=store_rs)
+  # }
   
   if(store_rs)PE.resultObj.working.lo<-PE.resultObj.working
   print_progress(paste("End low with ",PE.iteration," iterations"))
@@ -329,19 +336,19 @@ calibrate.optim <- function(par, fn, lower, upper,parscale,param_custom_opti,par
   print_progress(paste("start medium: ",paste(par,collapse = "|")))
   PE.iteration<<-0
   PE.resultObj.working<<-list()
-    if(length(par)>1){
-      OLS_mi <- try(optim(par=curpar, 
+    # if(length(par)>1){
+      OLS_mi <- optim(par=curpar, 
                           fn=fn, method="Nelder-Mead", control = list(parscale=parscale, maxit=100),
                           param_custom_opti=param_custom_opti,param_def=param_def,
                           end_stage=end_stage,low = lower, up = upper,
-                          store_rs=store_rs))
-    }else{
-      OLS_mi <- try(optim(par=curpar, 
-                          fn=fn, method="L-BFGS-B", control = list(parscale=parscale, maxit=100),
-                          param_custom_opti=param_custom_opti,param_def=param_def,
-                          end_stage=end_stage,low = lower, up = upper,lower = lower, upper = upper,
-                          store_rs=store_rs))
-    }
+                          store_rs=store_rs)
+    # }else{
+    #   OLS_mi <- optim(par=curpar, 
+    #                       fn=fn, method="L-BFGS-B", control = list(parscale=parscale, maxit=100),
+    #                       param_custom_opti=param_custom_opti,param_def=param_def,
+    #                       end_stage=end_stage,low = lower, up = upper,lower = lower, upper = upper,
+    #                       store_rs=store_rs)
+    # }
   if(store_rs)PE.resultObj.working.mi<-PE.resultObj.working
   print_progress(paste("End medium with ",PE.iteration," iterations"))
   
@@ -349,19 +356,19 @@ calibrate.optim <- function(par, fn, lower, upper,parscale,param_custom_opti,par
   print_progress(paste("start high: ",paste(curpar,collapse = "|")))
   PE.iteration<<-0
   PE.resultObj.working<<-list()
-  if(length(par)>1){
-    OLS_hi <- try(optim(par=curpar, 
+  # if(length(par)>1){
+    OLS_hi <- optim(par=curpar, 
                         fn=fn, method="Nelder-Mead", control = list(parscale=parscale, maxit=100),
                         param_custom_opti=param_custom_opti,param_def=param_def,
                         end_stage=end_stage,low = lower, up = upper,
-                        store_rs=store_rs))
-  }else{
-    OLS_hi <- try(optim(par=curpar, 
-                        fn=fn, method="L-BFGS-B", control = list(parscale=parscale, maxit=100),
-                        param_custom_opti=param_custom_opti,param_def=param_def,
-                        end_stage=end_stage,low = lower, up = upper,lower = lower, upper = upper,
-                        store_rs=store_rs))
-  }
+                        store_rs=store_rs)
+  # }else{
+  #   OLS_hi <- optim(par=curpar, 
+  #                       fn=fn, method="L-BFGS-B", control = list(parscale=parscale, maxit=100),
+  #                       param_custom_opti=param_custom_opti,param_def=param_def,
+  #                       end_stage=end_stage,low = lower, up = upper,lower = lower, upper = upper,
+  #                       store_rs=store_rs)
+  # }
   if(store_rs)PE.resultObj.working.hi<-PE.resultObj.working
   print_progress(paste("End high with ",PE.iteration," iterations"))
   
@@ -545,6 +552,7 @@ calibrate.rmse <-function(modelFUN,
     if(any(param_custom<low) %in% TRUE) return(Inf)
     if(any(param_custom>up) %in% TRUE) return(Inf)
   }
+  
   if(!is.null(paramReplaceFUN))
     param_def<-do.call(paramReplaceFUN,list(param_def,param_custom_opti,param_custom))
   
@@ -558,6 +566,9 @@ calibrate.rmse <-function(modelFUN,
   PE.iteration<<-ifelse(!exists("PE.iteration"),1,PE.iteration+1)
   if(!exists("PE.skipRun"))PE.skipRun<<-list()
   
+  if(!is.null(param_custom)){
+    print_progress(paste("[",PE.iteration,"] Start ",paste(param_custom_opti,collapse = "|"),"=",paste(param_custom,collapse = "|")))
+  }
   # execute model for all available measured sites
   resultDF<-list()
   list_day_se<-list()
@@ -570,6 +581,7 @@ calibrate.rmse <-function(modelFUN,
       #logic to skip run
       if(!site %in% names(PE.skipRun))PE.skipRun$site<<-list()
       if(site %in% PE.SITE_OPT_OUT) next
+      if(length(PE.SITE_OPT_IN)>0 && !site %in% PE.SITE_OPT_IN) next
       
       resultDF[[site]]<-list()
       
@@ -636,7 +648,7 @@ calibrate.rmse <-function(modelFUN,
   rmse_gs<-sqrt(mean(unlist(list_gs_se)))
   
   if(!is.null(param_custom)){
-    print_detail(paste("[",PE.iteration,"]",paste(param_custom_opti,collapse = "|"),"=",paste(param_custom,collapse = "|"),"[ RMSE_Day=",rmse_day," RMSE_GS=",rmse_gs,"]"))
+    print_progress(paste("[",PE.iteration,"] finish ",paste(param_custom_opti,collapse = "|"),"=",paste(param_custom,collapse = "|"),"[ RMSE_Day=",rmse_day," RMSE_GS=",rmse_gs,"]"))
   }
   
   if(store_rs){

@@ -1,5 +1,5 @@
 library(readxl)
-library(xlsx)
+
 library(dplyr)
 library(data.table)
 ## Coding of Wang's Small grain cereal phenology model
@@ -65,8 +65,8 @@ wang.main <-
     # define parameters
     dailyPrediction <- new('WangPrediction')
     dailyPrediction<-as.data.frame(dailyPrediction)
-    dailyPrediction@stage_dev <- -1
-    dailyPrediction@stage_ec <- 0
+    dailyPrediction$stage_dev <- -1
+    dailyPrediction$stage_ec <- 0
     
     progress <- as.list(nrow(weather_data))
     
@@ -78,8 +78,8 @@ wang.main <-
       ## bind daily weather data
       dailyWeather <- weatherRow#as.Weather(weatherRow, dailyWeather)
       ## process the model
-      dailyPrediction@day <- i - 1
-      dailyPrediction@date <- dailyWeather@date
+      dailyPrediction$day <- i - 1
+      dailyPrediction$date <- dailyWeather$date
       if(i>1)#skip sown day
         dailyPrediction <-
           wang.process(dailyPrediction, parameters, dailyWeather)
@@ -87,7 +87,7 @@ wang.main <-
       dailyPrediction <-
         wang.f_stage_ec(dailyPrediction, parameters)
       ##Log result
-      dailyPrediction@weather_source <- dailyWeather@source
+      dailyPrediction$weather_source <- dailyWeather$source
       # if (i > 1) {
       #   resultDF <- rbind(resultDF, as.data.frame(dailyPrediction))
       # } else{
@@ -100,15 +100,15 @@ wang.main <-
           "Day ",
           i,
           " Stage ",
-          dailyPrediction@stage_dev,
+          dailyPrediction$stage_dev,
           "[",
-          dailyPrediction@stage_ec,
+          dailyPrediction$stage_ec,
           "]"
         )
       )
       ## log into csv file
       #wang.write_prediction(dailyPrediction)
-      if (dailyPrediction@stage_dev >= 2 || dailyPrediction@stage_ec >= next_ec(end_stage) || i > 1000)
+      if (dailyPrediction$stage_dev >= 2 || dailyPrediction$stage_ec >= next_ec(end_stage) || i > 1000)
         break
     }
     
@@ -129,21 +129,21 @@ wang.main <-
 #' process the prediction by one time frame
 #' output: Prediction object
 wang.process<-function(dailyPrediction,parameters,dailyWeather){
-  if(dailyPrediction@stage_dev< -0.5){
+  if(dailyPrediction$stage_dev< -0.5){
     dailyPrediction<- wang.germination(dailyPrediction,parameters,dailyWeather)
-  }else if(dailyPrediction@stage_dev<0){
+  }else if(dailyPrediction$stage_dev<0){
     dailyPrediction<- wang.f_emerge(dailyPrediction,parameters,dailyWeather)
-    #  }else if(dailyPrediction@stage_dev<0.4){
+    #  }else if(dailyPrediction$stage_dev<0.4){
     #    wang.f_terminal_spikelet()
-  }else if(dailyPrediction@stage_dev<1){
+  }else if(dailyPrediction$stage_dev<1){
     dailyPrediction<- wang.f_anthesis(dailyPrediction,parameters,dailyWeather)
-    if(dailyPrediction@stage_dev>=0 && dailyPrediction@stage_dev<0.45){
+    if(dailyPrediction$stage_dev>=0 && dailyPrediction$stage_dev<0.45){
       dailyPrediction<-wang.f_leave(dailyPrediction,parameters,dailyWeather)
       dailyPrediction<-wang.f_tiller(dailyPrediction,parameters,dailyWeather)
-    } else if(dailyPrediction@stage_dev>=0.45 && dailyPrediction@stage_dev<0.65){
+    } else if(dailyPrediction$stage_dev>=0.45 && dailyPrediction$stage_dev<0.65){
       dailyPrediction<-wang.f_node(dailyPrediction,parameters,dailyWeather)
     }
-  }else if(dailyPrediction@stage_dev<2){
+  }else if(dailyPrediction$stage_dev<2){
     dailyPrediction<- wang.f_maturity(dailyPrediction,parameters,dailyWeather)
   }
   dailyPrediction<-wang.f_stage_ec(dailyPrediction, parameters)
@@ -154,16 +154,16 @@ wang.process<-function(dailyPrediction,parameters,dailyWeather){
 wang.germination<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   
-  dailyPrediction@dev_em_rate<- 0.5
-  dailyPrediction@stage_dev<- dailyPrediction@stage_dev+dailyPrediction@dev_em_rate
+  dailyPrediction$dev_em_rate<- 0.5
+  dailyPrediction$stage_dev<- dailyPrediction$stage_dev+dailyPrediction$dev_em_rate
   return(dailyPrediction)
 }
 ##ref. P.3
 wang.f_emerge<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   
-  dailyPrediction@dev_em_rate<- (dailyWeather@temp_avg-parameters@temp_base)*0.5 / parameters@temp_emerg_sum
-  dailyPrediction@stage_dev<- dailyPrediction@stage_dev+dailyPrediction@dev_em_rate
+  dailyPrediction$dev_em_rate<- (dailyWeather$temp_avg-parameters@temp_base)*0.5 / parameters@temp_emerg_sum
+  dailyPrediction$stage_dev<- dailyPrediction$stage_dev+dailyPrediction$dev_em_rate
   return(dailyPrediction)
 }
 
@@ -176,10 +176,10 @@ wang.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"V")
   dailyPrediction<- wang.f_photo_resp(dailyPrediction,parameters,dailyWeather)
   dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
-  dailyPrediction@dev_v_rate<- 1/parameters@dev_v_min_day *dailyPrediction@temp_resp_rate *dailyPrediction@photo_resp_rate *dailyPrediction@vern_resp_rate
-  dailyPrediction@stage_dev<- dailyPrediction@stage_dev + dailyPrediction@dev_v_rate
-  if(is.nan(dailyPrediction@dev_v_rate)){
-    print_debug("hold!!! dailyPrediction@dev_v_rate is NaN")
+  dailyPrediction$dev_v_rate<- 1/parameters@dev_v_min_day *dailyPrediction$temp_resp_rate *dailyPrediction$photo_resp_rate *dailyPrediction$vern_resp_rate
+  dailyPrediction$stage_dev<- dailyPrediction$stage_dev + dailyPrediction$dev_v_rate
+  if(is.nan(dailyPrediction$dev_v_rate)){
+    print_debug("hold!!! dailyPrediction$dev_v_rate is NaN")
   }
   return(dailyPrediction)
 }
@@ -189,10 +189,10 @@ wang.f_maturity<-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction<- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"R")
   dailyPrediction<- wang.f_photo_resp(dailyPrediction,parameters,dailyWeather)
   #dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
-  dailyPrediction@dev_r_rate<- 1/parameters@dev_r_min_day *dailyPrediction@temp_resp_rate
-  dailyPrediction@stage_dev<- dailyPrediction@stage_dev + dailyPrediction@dev_r_rate
-  if(is.nan(dailyPrediction@dev_v_rate)){
-    print_debug("hold!!! dailyPrediction@dev_v_rate is NaN")
+  dailyPrediction$dev_r_rate<- 1/parameters@dev_r_min_day *dailyPrediction$temp_resp_rate
+  dailyPrediction$stage_dev<- dailyPrediction$stage_dev + dailyPrediction$dev_r_rate
+  if(is.nan(dailyPrediction$dev_v_rate)){
+    print_debug("hold!!! dailyPrediction$dev_v_rate is NaN")
   }
   return(dailyPrediction)
 }
@@ -206,15 +206,15 @@ wang.f_maturity<-function(dailyPrediction,parameters,dailyWeather){
 ## output: vr_temp_resp_rate, _alpha 
 ## ref: P.4,8
 wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
-  if(dailyWeather@temp_avg>=parameters@temp_cardinal[phaseInd,"MIN"] && dailyWeather@temp_avg<=parameters@temp_cardinal[phaseInd,"MAX"]){
-    temp_avg<-dailyWeather@temp_avg
+  if(dailyWeather$temp_avg>=parameters@temp_cardinal[phaseInd,"MIN"] && dailyWeather$temp_avg<=parameters@temp_cardinal[phaseInd,"MAX"]){
+    temp_avg<-dailyWeather$temp_avg
     temp_max<-parameters@temp_cardinal[phaseInd,"MAX"]
     temp_min<-parameters@temp_cardinal[phaseInd,"MIN"]
     temp_opt<-parameters@temp_cardinal[phaseInd,"OPT"]
     
     if(temp_max<=temp_opt || temp_opt<=temp_min){warning("Temperature min,opt,max not in sequence",c(phaseInd,temp_max,temp_opt,temp_min))}
     alpha<-log(2)/log((temp_max-temp_min)/(temp_opt-temp_min))
-    dailyPrediction@alpha<-alpha
+    dailyPrediction$alpha<-alpha
     
     temp_resp_rate<-(2*(temp_avg-temp_min)^alpha*(temp_opt-temp_min)^alpha-(temp_avg-temp_min)^(2*alpha))/(temp_opt-temp_min)^(2*alpha)
     
@@ -226,11 +226,11 @@ wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
   }
   
   if(phaseInd %in% c("V","R")){
-    dailyPrediction@temp_resp_rate<- temp_resp_rate
+    dailyPrediction$temp_resp_rate<- temp_resp_rate
   } else if(phaseInd %in% c("VN")){
-    dailyPrediction@vern_temp_resp<- temp_resp_rate
+    dailyPrediction$vern_temp_resp<- temp_resp_rate
   } else if(phaseInd %in% c("IF")){
-    dailyPrediction@leave_temp_resp<- temp_resp_rate
+    dailyPrediction$leave_temp_resp<- temp_resp_rate
   }
   
   return(dailyPrediction)
@@ -242,20 +242,20 @@ wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
 ## ref. P.6,7
 wang.f_photo_resp <-function(dailyPrediction,parameters,dailyWeather){
   ##init assignment of omega (defined or parameters deduced variable)
-  if(length(dailyPrediction@omega)==0||dailyPrediction@omega==0){
+  if(length(dailyPrediction$omega)==0||dailyPrediction$omega==0){
     if(length(parameters@photo_sen)==0 || is.na(parameters@photo_sen)){
       omega<-4/abs(parameters@photo_opp-parameters@photo_crit)
     }else{
       omega<-parameters@photo_sen
     }
   }else{
-    omega<-dailyPrediction@omega
+    omega<-dailyPrediction$omega
   }
   
-  photo_resp_rate<-min(1,max(0,1-exp(-parameters@photo_sig*omega*(dailyWeather@photo_len-parameters@photo_crit))))
+  photo_resp_rate<-min(1,max(0,1-exp(-parameters@photo_sig*omega*(dailyWeather$photo_len-parameters@photo_crit))))
   
-  dailyPrediction@omega<-omega
-  dailyPrediction@photo_resp_rate <-photo_resp_rate
+  dailyPrediction$omega<-omega
+  dailyPrediction$photo_resp_rate <-photo_resp_rate
   return(dailyPrediction)
 }
 
@@ -266,24 +266,24 @@ wang.f_photo_resp <-function(dailyPrediction,parameters,dailyWeather){
 wang.f_vern_resp <-function(dailyPrediction,parameters,dailyWeather){
   dailyPrediction <- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"VN")
   if(parameters@vern_full==0){ ## no reduction from vernerisation
-    dailyPrediction@vern_temp_sum<-1
-    dailyPrediction@vern_resp_rate<-1
+    dailyPrediction$vern_temp_sum<-1
+    dailyPrediction$vern_resp_rate<-1
     
   }else{
     
-    vern_temp_resp <-dailyPrediction@vern_temp_resp
+    vern_temp_resp <-dailyPrediction$vern_temp_resp
     
-    vern_temp_sum<- dailyPrediction@vern_temp_sum + vern_temp_resp
+    vern_temp_sum<- dailyPrediction$vern_temp_sum + vern_temp_resp
     vern_resp_rate<- min(1, 
                          max(0,
                              (vern_temp_sum-parameters@vern_base)/(parameters@vern_full/parameters@vern_base)
                          )
     )
-    dailyPrediction@vern_temp_sum<-vern_temp_sum
-    dailyPrediction@vern_resp_rate<-vern_resp_rate
+    dailyPrediction$vern_temp_sum<-vern_temp_sum
+    dailyPrediction$vern_resp_rate<-vern_resp_rate
   }
-  if(is.nan(dailyPrediction@vern_temp_resp)){
-    print_debug("hold!!! dailyPrediction@vern_temp_resp is NaN")
+  if(is.nan(dailyPrediction$vern_temp_resp)){
+    print_debug("hold!!! dailyPrediction$vern_temp_resp is NaN")
   }
   return(dailyPrediction)
 }
@@ -293,31 +293,31 @@ wang.f_vern_resp <-function(dailyPrediction,parameters,dailyWeather){
 ## output: vr_leave_prim_rate,vr_leave_app_rate,vr_leave_unemerge,vr_leave_sum
 ##assumption: after floral initiation, no new leaf primodia initiation
 wang.f_leave <-function(dailyPrediction,parameters,dailyWeather){
-  if(dailyPrediction@stage_dev<0||dailyPrediction@stage_dev>0.65)return(dailyPrediction);
+  if(dailyPrediction$stage_dev<0||dailyPrediction$stage_dev>0.65)return(dailyPrediction);
   
   ##R(If,app), A(if)
-  if(dailyPrediction@stage_dev<=0.2){ ## b4 floral initiation
+  if(dailyPrediction$stage_dev<=0.2){ ## b4 floral initiation
     ##R(prim,ini), A(if,u)
     dailyPrediction<-wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"IF")
-    temp_resp<-dailyPrediction@leave_temp_resp
+    temp_resp<-dailyPrediction$leave_temp_resp
     
-    photo_resp<-dailyPrediction@photo_resp_rate
+    photo_resp<-dailyPrediction$photo_resp_rate
     
     leave_prim_rate<- parameters@leave_prim_mx*temp_resp*photo_resp
     leave_app_rate<- parameters@leave_app_mx*temp_resp*photo_resp
-    leave_unemerge<-dailyPrediction@leave_unemerge+ leave_prim_rate -leave_app_rate
-    leave_sum<-dailyPrediction@leave_sum+ leave_app_rate
+    leave_unemerge<-dailyPrediction$leave_unemerge+ leave_prim_rate -leave_app_rate
+    leave_sum<-dailyPrediction$leave_sum+ leave_app_rate
     
-    dailyPrediction@leave_prim_rate<-leave_prim_rate
-    dailyPrediction@leave_app_rate<-leave_app_rate
-    dailyPrediction@leave_sum<-leave_sum
-    dailyPrediction@leave_unemerge<-leave_unemerge
-  }else if(dailyPrediction@stage_dev<=0.65){ ## b4 flag leave
-    leave_app_rate<- dailyPrediction@dev_v_rate*dailyPrediction@leave_unemerge/(0.65-0.2) #stage_fi_fl_itv
-    leave_sum<-dailyPrediction@leave_sum+ leave_app_rate
+    dailyPrediction$leave_prim_rate<-leave_prim_rate
+    dailyPrediction$leave_app_rate<-leave_app_rate
+    dailyPrediction$leave_sum<-leave_sum
+    dailyPrediction$leave_unemerge<-leave_unemerge
+  }else if(dailyPrediction$stage_dev<=0.65){ ## b4 flag leave
+    leave_app_rate<- dailyPrediction$dev_v_rate*dailyPrediction$leave_unemerge/(0.65-0.2) #stage_fi_fl_itv
+    leave_sum<-dailyPrediction$leave_sum+ leave_app_rate
     
-    dailyPrediction@leave_app_rate<-leave_app_rate  
-    dailyPrediction@leave_sum<-leave_sum
+    dailyPrediction$leave_app_rate<-leave_app_rate  
+    dailyPrediction$leave_sum<-leave_sum
   }
   return(dailyPrediction)
 }
@@ -327,12 +327,12 @@ wang.f_leave <-function(dailyPrediction,parameters,dailyWeather){
 ## input: p_node_mx,p_temp_cardinal,vr_temp_avg,vr_photo_resp_rate,vr_stage_dev
 ## output: vr_node_rate, vr_node_sum
 wang.f_node <-function(dailyPrediction,parameters,dailyWeather){
-  if(dailyPrediction@stage_dev<0.45||dailyPrediction@stage_dev>1)return(dailyPrediction);
-  node_rate<-parameters@node_mx*dailyPrediction@temp_resp_rate*dailyPrediction@photo_resp_rate
-  node_sum<-dailyPrediction@node_sum+node_rate
+  if(dailyPrediction$stage_dev<0.45||dailyPrediction$stage_dev>1)return(dailyPrediction);
+  node_rate<-parameters@node_mx*dailyPrediction$temp_resp_rate*dailyPrediction$photo_resp_rate
+  node_sum<-dailyPrediction$node_sum+node_rate
   
-  dailyPrediction@node_rate<-node_rate
-  dailyPrediction@node_sum<-node_sum
+  dailyPrediction$node_rate<-node_rate
+  dailyPrediction$node_sum<-node_sum
   return(dailyPrediction)
 }
 
@@ -340,9 +340,9 @@ wang.f_node <-function(dailyPrediction,parameters,dailyWeather){
 ## input: vr_leave_sum
 ## output: vr_till_main_sum 
 wang.f_tiller <-function(dailyPrediction,parameters,dailyWeather){
-  if(dailyPrediction@stage_dev<0||dailyPrediction@stage_dev>0.45)return(dailyPrediction);
-  till_main_sum<- max(0,dailyPrediction@leave_sum-2.5)
-  dailyPrediction@till_main_sum<-till_main_sum
+  if(dailyPrediction$stage_dev<0||dailyPrediction$stage_dev>0.45)return(dailyPrediction);
+  till_main_sum<- max(0,dailyPrediction$leave_sum-2.5)
+  dailyPrediction$till_main_sum<-till_main_sum
   return(dailyPrediction)
 }
 
@@ -350,18 +350,18 @@ wang.f_tiller <-function(dailyPrediction,parameters,dailyWeather){
 ## input: vr_stage_dev,vr_leave_sum,vr_node_sum,vr_till_main_sum,p_stage_vr_ec_tbl
 ## output: vr_stage_ec
 wang.f_stage_ec <-function(dailyPrediction,parameters){
-  stage_dev<-dailyPrediction@stage_dev
+  stage_dev<-dailyPrediction$stage_dev
   stage_ec<-0
   if(stage_dev<0){
     stage_ec<-10*(1+stage_dev)
   }else if(stage_dev<0.45){
-    if(length(dailyPrediction@till_main_sum)==0 || dailyPrediction@till_main_sum==0){
-      stage_ec<-min(20,10+dailyPrediction@leave_sum)
+    if(length(dailyPrediction$till_main_sum)==0 || dailyPrediction$till_main_sum==0){
+      stage_ec<-min(20,10+dailyPrediction$leave_sum)
     }else{
-      stage_ec<-min(30,20+dailyPrediction@till_main_sum)
+      stage_ec<-min(30,20+dailyPrediction$till_main_sum)
     }
   }else if(stage_dev<0.65){
-    stage_ec<-min(40,30+dailyPrediction@node_sum)
+    stage_ec<-min(40,30+dailyPrediction$node_sum)
   }else if(stage_dev<=0.90){
     stage_ec<-40+10*(stage_dev-0.65)/(0.9-0.65)
   }else if(stage_dev<=1){
@@ -375,7 +375,7 @@ wang.f_stage_ec <-function(dailyPrediction,parameters){
   }else{
     stage_ec<-min(92,90+2*(stage_dev-1.95)/(2-1.95))
   }
-  dailyPrediction@stage_ec<-stage_ec
+  dailyPrediction$stage_ec<-stage_ec
   return(dailyPrediction)
 }
 
