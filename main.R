@@ -85,7 +85,7 @@ clear_env<-function(){
   #common.R:lookup.weather_station
   remove(LU.site_station_table)
   
-  #parameter_estimation.R: wang.rmse
+  #parameter_estimation.R: we.rmse
   remove(PE.resultObj,pos = ".GlobalEnv" )
   remove(PE.iteration,pos = ".GlobalEnv")
 }
@@ -94,7 +94,7 @@ cal.parameter<-function(){
   result_b4=cwm.main("./Weather/W_100EA002_2016.xlsx","./Parameters/CWm_Parameters.xlsx",conf_id = 1, sown_date = "2016-04-17")
   result_opm=cwm.main("./Weather/W_100EA002_2016.xlsx","./Parameters/CWm_Parameters.xlsx",conf_id = 15, sown_date = "2016-04-17")
   obsDF<- read_excel("./Phenology/P_WindsorWest_2016.xlsx")
-  plot.EC(wang_df = result_b4,cwm_df = result_opm)
+  plot.EC(we_df = result_b4,cwm_df = result_opm)
   plot.Sim_Obs(simDFs = c(result_b4,result_opm),simDFs_leg = c("Before","After"),obsDF)
   analysis.gs.err.rmse(obsDF = obsDF,simDF = result_b4)
   analysis.obsDay.err.rmse(obsDF = obsDF,simDF = result_opm)
@@ -103,35 +103,4 @@ cal.parameter<-function(){
 load_prof <-function(str){
   library(profvis)
   profvis({eval(parse(text=str))})
-}
-
-cwm.eachYearParameter<-function(yearList,optOutSites=NULL){
-  PE.modelExecutionCount<<-0
-  avaDF=read_excel('./AvailablePhenologySeason.xlsx',sheet="Sheet1")
-  list_ava_years<-as.list(unique(avaDF[,'year']))$year
-  for(i in 1:length(list_ava_years)){
-    year=list_ava_years[i]
-    if(year %in% yearList){
-      print(paste("Process year ",year))
-      cwm_par<-cwm.calibrate(str_param_file = "./Parameters/CWm_Parameters.xlsx",
-                     list_site_weather = stdWeatherDT, list_site_phenology = stdPhenologyDT, conf_id=10,
-                     start_year = year,end_year = year,optOutSites = optOutSites)
-      saveRDS(cwm_par,paste('./Parameters/cwmCalParHistYr',as.character(year),'.rds',sep = ""))
-    }
-  }
-}
-wang.eachYearParameter<-function(yearList,optOutSites=NULL){
-  PE.modelExecutionCount<<-0
-  avaDF=read_excel('./AvailablePhenologySeason.xlsx',sheet="Sheet1")
-  list_ava_years<-as.list(unique(avaDF[,'year']))$year
-  for(i in 1:length(list_ava_years)){
-    year=list_ava_years[i]
-    if(year %in% yearList){
-      print(paste("Process year ",year))
-      wang_par<-wang.calibrate(str_param_file = "./Parameters/Wang_Parameters.xlsx",
-                                        list_site_weather = stdWeatherDT, list_site_phenology = stdPhenologyDT, conf_id=3,
-                                        start_year = year,end_year = year,optOutSites = optOutSites)
-      saveRDS(wang_par,paste('./Parameters/wangCalParHistYr',as.character(year),'.rds',sep = ""))
-    }
-  }
 }

@@ -1,8 +1,9 @@
 library(readxl)
-
+library(xlsx)
 library(dplyr)
 library(data.table)
-## Coding of Wang's Small grain cereal phenology model
+library(lubridate)
+## Coding of WE's Small grain cereal phenology model
 ## Author: Russell Kong
 ## Date: 16 JUN 2017
 ## version: 0
@@ -16,65 +17,105 @@ library(data.table)
 #' @param str_outfile output prediction file location
 #' @param conf_id row id of parameters set to use from the parameter file
 #' @param sown_date the start date of simulation 
-#' @param weather_actual_end define end date of actual weather data reading, continue with predicted data
+#' @param weather_actual_end_date define end date of actual weather data reading, continue with predicted data
+#' @param weather_actual_end_stage define stage to use forecast weather data
 #' @param parameters_df custom dataframe for parameters. For calibration use. Ignore file location on applied
 #' @param weather_data_dt custom dataframe for weather data For calibration use, performance improvement on multiple iteration
-
 #'
 #' @return data.frame (result of prediction)
 #' @export
 #'
-#' @examples wang.main("weather.xlsx","Properties.xlsx", "out8.xlsx",1,"2016-02-01")
-#' @examples wang.main("./Weather/W_100EA002_2016.xlsx","./Parameters/Wang_Parameters.xlsx", str_outfile="out8.xlsx",conf_id=4,sown_date="2016-04-21")
-wang.main <-
-  function(str_weather_file,
+#' @examples we.main("weather.xlsx","Properties.xlsx", "out8.xlsx",1,"2016-02-01")
+#' @examples we.main("./Weather/W_100EA002_2016.xlsx","./Parameters/WE_Parameters.xlsx", str_outfile="out8.xlsx",conf_id=4,sown_date="2016-04-21")
+#' we.main(str_weather_file = "./Weather/W_100EA002_2016.xlsx",str_weather_forecast_file = "./Weather/CocklePark_forecast_2016.xlsx",weather_actual_end_stage = 50, str_param_file = "./Parameters/WE_Parameters.xlsx", conf_id=7,sown_date="2016-04-21")
+we.main <-
+  function(str_weather_file=NULL,str_weather_forecast_file=NULL,
            str_param_file,
            str_outfile = NULL,
            conf_id = 1,
            sown_date = NULL,
-           weather_actual_end = NULL,
+           weather_actual_end_date = NULL,
+           weather_actual_end_stage= NULL,
            parameters_df = NULL,
            weather_data_dt = NULL,
-           end_stage = 99,verbose=TRUE) {
+           weather_forecast_dt = NULL,
+           end_stage = 99,
+           verbose=TRUE,
+           mode="Normal") {
     
     #' initation
+    sown_date<-as.POSIXct(sown_date,tz = "UTC")
+    if(!is.null(weather_actual_end_date))
+      weather_actual_end_date<-as.POSIXct(weather_actual_end_date,tz = "UTC")
     
     ## set parameters
     if (is.null(parameters_df)) {
-      parameters <- new('WangParameterSet')
-      parameters <- wang.set_param(str_param_file, parameters, conf_id)
+      parameters <- new('WEParameterSet')
+      parameters <- we.set_param(str_param_file, parameters, conf_id)
     }else{
       parameters <- parameters_df
     }
     
     
     ## load Weather data
-    if (is.null(weather_data_dt)) {
+    weather_data=NULL
+    if (!is.null(weather_data_dt)) {
+      weather_data <- weather_data_dt[date >= sown_date & date <= sown_date+days(365)]
+    }else if(!is.null(str_weather_file)) {
       weather_data <-
         load.weather(str_weather_file,
-                     weather_actual_end = weather_actual_end,
                      start_date = sown_date)
-    }else{
-      #weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365))
-      weather_data <- weather_data_dt[date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365)]
     }
+    weather_forecast=NULL
+    if (!is.null(weather_forecast_dt)){
+      weather_forecast <- weather_forecast_dt[date >= sown_date & date <= sown_date+days(365)]
+    } else if(!is.null(str_weather_forecast_file)) {
+      weather_forecast <-
+        load.weather(str_weather_forecast_file,
+                     start_date = sown_date,
+                     mode="forecast")
+    }
+    if(!exists("weather_data") && !exists("weather_forecast")){stop("No input weather")}
+    
     
     ## init variables
     dailyWeather <- new('Weather')
     
     # define parameters
-    dailyPrediction <- new('WangPrediction')
+    dailyPrediction <- new('WEPrediction')
     dailyPrediction<-as.data.frame(dailyPrediction)
     dailyPrediction$stage_dev <- -1
     dailyPrediction$stage_ec <- 0
     
-    progress <- as.list(nrow(weather_data))
-    
+    progress <- as.list(365)
+    if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+      forecastProgress<-as.list(365)#section 2
+    }
     #' Modelling Loop
     if(verbose)print_detail(paste("Number available weather days: ", nrow(weather_data)))
-    if(verbose)print_progress("Start Processing: \n")
-    for (i in 1:nrow(weather_data)) {
-      weatherRow <- weather_data[i,]
+    if(verbose)print_progress("Start Processing: ")
+    i=1
+    cur_date=sown_date
+    while (dailyPrediction$stage_dev < 2 &&
+           dailyPrediction$stage_ec < next_ec(end_stage) && 
+           i < 365 ) {
+      
+      if(!is.null(weather_data) && 
+         (is.null(weather_actual_end_stage) || dailyPrediction$stage_ec<weather_actual_end_stage) &&
+         (is.null(weather_actual_end_date) || cur_date<weather_actual_end_date)
+          ){
+        weatherRow <- weather_data[date == cur_date,]
+        if(nrow(weatherRow)==0 && !is.null(weather_forecast)){
+            weatherRow <- weather_forecast[date == cur_date,]
+        }
+      }else if(!is.null(weather_forecast)){
+        weatherRow <- weather_forecast[date == cur_date,]
+      }
+      if(nrow(weatherRow)==0){
+        print_critical(paste("No matching weather data for the date|",cur_date))
+        break
+      }
+      
       ## bind daily weather data
       dailyWeather <- weatherRow#as.Weather(weatherRow, dailyWeather)
       ## process the model
@@ -82,10 +123,10 @@ wang.main <-
       dailyPrediction$date <- dailyWeather$date
       if(i>1)#skip sown day
         dailyPrediction <-
-          wang.process(dailyPrediction, parameters, dailyWeather)
+          we.process(dailyPrediction, parameters, dailyWeather)
       ## projection of EC stage
       dailyPrediction <-
-        wang.f_stage_ec(dailyPrediction, parameters)
+        we.f_stage_ec(dailyPrediction, parameters)
       ##Log result
       dailyPrediction$weather_source <- dailyWeather$source
       # if (i > 1) {
@@ -94,6 +135,25 @@ wang.main <-
         # resultDF <- as.data.frame(dailyPrediction)
       # }
       progress[[i]] <- dailyPrediction
+      
+      #Section 2: project forecast to 9 days
+      if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+        forecastPrediction<-dailyPrediction
+        for(j in 1:9){
+          # single forecast file used, ideal if daily forecast of each following day from the cur_date is available
+          forecastWeatherRow <- weather_forecast[date == cur_date+days(j),]
+          if(nrow(forecastWeatherRow)==0) {
+            print_critical(paste("No matching weather data for forecast date|",cur_date,cur_date+days(j))) 
+            break
+          }
+          forecastPrediction$day <- i-1+j
+          forecastPrediction$date <- cur_date+days(j)
+          forecastPrediction$weather_source <- forecastWeatherRow$source
+          forecastPrediction<-we.process(forecastPrediction,parameters,forecastWeatherRow )
+        }
+        #only the ninth day retained
+        forecastProgress[[i]]<-forecastPrediction
+      }
       
       if(verbose)print_detail(
         paste(
@@ -107,20 +167,30 @@ wang.main <-
         )
       )
       ## log into csv file
-      #wang.write_prediction(dailyPrediction)
-      if (dailyPrediction$stage_dev >= 2 || dailyPrediction$stage_ec >= next_ec(end_stage) || i > 1000)
-        break
+      #we.write_prediction(dailyPrediction)
+      i<-i+1
+      cur_date<-cur_date+days(1)
     }
     
     resultDF<-rbindlist(progress)
+    if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+      forecastResultDF<-rbindlist(forecastProgress)
+    }
     
     #' Output handling
-    if (!is.null(str_outfile))
-      writeResult(paste("./output/Wang",weather_data[1,]$site,str_outfile,sep = "_"), resultDF, parameters)
+    if (!is.null(str_outfile)){
+      writeResult(paste("./output/WE",weather_data[1,]$site,str_outfile,sep = "_"), resultDF, parameters)
+      if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+        writeResult(paste("./output/WE",weather_data[1,]$site,str_outfile,sep = "_"), forecastResultDF, parameters,sheet="forecast")
+      }
+    }
     if(verbose)print_progress(paste("Row processed: ", i))
+    
+    if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+      return(list(result=resultDF,forecast=forecastResultDF))
+    }
+    
     return(resultDF)
-    ## close infile
-    ## close outfile
   }
 
 #'##########################
@@ -128,54 +198,54 @@ wang.main <-
 #'##########################
 #' process the prediction by one time frame
 #' output: Prediction object
-wang.process<-function(dailyPrediction,parameters,dailyWeather){
+we.process<-function(dailyPrediction,parameters,dailyWeather){
   if(dailyPrediction$stage_dev< -0.5){
-    dailyPrediction<- wang.germination(dailyPrediction,parameters,dailyWeather)
+    dailyPrediction<- we.germination(dailyPrediction,parameters,dailyWeather)
   }else if(dailyPrediction$stage_dev<0){
-    dailyPrediction<- wang.f_emerge(dailyPrediction,parameters,dailyWeather)
+    dailyPrediction<- we.f_emerge(dailyPrediction,parameters,dailyWeather)
     #  }else if(dailyPrediction$stage_dev<0.4){
-    #    wang.f_terminal_spikelet()
+    #    we.f_terminal_spikelet()
   }else if(dailyPrediction$stage_dev<1){
-    dailyPrediction<- wang.f_anthesis(dailyPrediction,parameters,dailyWeather)
+    dailyPrediction<- we.f_anthesis(dailyPrediction,parameters,dailyWeather)
     if(dailyPrediction$stage_dev>=0 && dailyPrediction$stage_dev<0.45){
-      dailyPrediction<-wang.f_leave(dailyPrediction,parameters,dailyWeather)
-      dailyPrediction<-wang.f_tiller(dailyPrediction,parameters,dailyWeather)
+      dailyPrediction<-we.f_leave(dailyPrediction,parameters,dailyWeather)
+      dailyPrediction<-we.f_tiller(dailyPrediction,parameters,dailyWeather)
     } else if(dailyPrediction$stage_dev>=0.45 && dailyPrediction$stage_dev<0.65){
-      dailyPrediction<-wang.f_node(dailyPrediction,parameters,dailyWeather)
+      dailyPrediction<-we.f_node(dailyPrediction,parameters,dailyWeather)
     }
   }else if(dailyPrediction$stage_dev<2){
-    dailyPrediction<- wang.f_maturity(dailyPrediction,parameters,dailyWeather)
+    dailyPrediction<- we.f_maturity(dailyPrediction,parameters,dailyWeather)
   }
-  dailyPrediction<-wang.f_stage_ec(dailyPrediction, parameters)
+  dailyPrediction<-we.f_stage_ec(dailyPrediction, parameters)
   
   return(dailyPrediction)
 }
 ## ref. P2., (J.R.Kiniry 1986- CERES-Maize) Assume same as CW model such that 1 day
-wang.germination<-function(dailyPrediction,parameters,dailyWeather){
-  dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
+we.germination<-function(dailyPrediction,parameters,dailyWeather){
+  dailyPrediction<- we.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   
   dailyPrediction$dev_em_rate<- 0.5
   dailyPrediction$stage_dev<- dailyPrediction$stage_dev+dailyPrediction$dev_em_rate
   return(dailyPrediction)
 }
 ##ref. P.3
-wang.f_emerge<-function(dailyPrediction,parameters,dailyWeather){
-  dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
+we.f_emerge<-function(dailyPrediction,parameters,dailyWeather){
+  dailyPrediction<- we.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   
   dailyPrediction$dev_em_rate<- (dailyWeather$temp_avg-parameters@temp_base)*0.5 / parameters@temp_emerg_sum
   dailyPrediction$stage_dev<- dailyPrediction$stage_dev+dailyPrediction$dev_em_rate
   return(dailyPrediction)
 }
 
-wang.f_terminal_spikelet<-function(){
+we.f_terminal_spikelet<-function(){
   
 }
 
 ##ref. P.3
-wang.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
-  dailyPrediction<- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"V")
-  dailyPrediction<- wang.f_photo_resp(dailyPrediction,parameters,dailyWeather)
-  dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
+we.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
+  dailyPrediction<- we.f_temp_resp(dailyPrediction,parameters,dailyWeather,"V")
+  dailyPrediction<- we.f_photo_resp(dailyPrediction,parameters,dailyWeather)
+  dailyPrediction<- we.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   dailyPrediction$dev_v_rate<- 1/parameters@dev_v_min_day *dailyPrediction$temp_resp_rate *dailyPrediction$photo_resp_rate *dailyPrediction$vern_resp_rate
   dailyPrediction$stage_dev<- dailyPrediction$stage_dev + dailyPrediction$dev_v_rate
   if(is.nan(dailyPrediction$dev_v_rate)){
@@ -185,10 +255,10 @@ wang.f_anthesis<-function(dailyPrediction,parameters,dailyWeather){
 }
 
 ##ref. P.3
-wang.f_maturity<-function(dailyPrediction,parameters,dailyWeather){
-  dailyPrediction<- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"R")
-  dailyPrediction<- wang.f_photo_resp(dailyPrediction,parameters,dailyWeather)
-  #dailyPrediction<- wang.f_vern_resp(dailyPrediction,parameters,dailyWeather)
+we.f_maturity<-function(dailyPrediction,parameters,dailyWeather){
+  dailyPrediction<- we.f_temp_resp(dailyPrediction,parameters,dailyWeather,"R")
+  dailyPrediction<- we.f_photo_resp(dailyPrediction,parameters,dailyWeather)
+  #dailyPrediction<- we.f_vern_resp(dailyPrediction,parameters,dailyWeather)
   dailyPrediction$dev_r_rate<- 1/parameters@dev_r_min_day *dailyPrediction$temp_resp_rate
   dailyPrediction$stage_dev<- dailyPrediction$stage_dev + dailyPrediction$dev_r_rate
   if(is.nan(dailyPrediction$dev_v_rate)){
@@ -205,7 +275,7 @@ wang.f_maturity<-function(dailyPrediction,parameters,dailyWeather){
 ## input: p_temp_cardinal, vr_temp_avg, phaseInd{V,R,VN,IF}
 ## output: vr_temp_resp_rate, _alpha 
 ## ref: P.4,8
-wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
+we.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
   if(dailyWeather$temp_avg>=parameters@temp_cardinal[phaseInd,"MIN"] && dailyWeather$temp_avg<=parameters@temp_cardinal[phaseInd,"MAX"]){
     temp_avg<-dailyWeather$temp_avg
     temp_max<-parameters@temp_cardinal[phaseInd,"MAX"]
@@ -240,7 +310,7 @@ wang.f_temp_resp <-function(dailyPrediction,parameters,dailyWeather,phaseInd){
 ## input: vr_photo_len, p_photo_crit, p_photo_sig, p_photo_opp
 ## output: _omega, vr_photo_resp_rate
 ## ref. P.6,7
-wang.f_photo_resp <-function(dailyPrediction,parameters,dailyWeather){
+we.f_photo_resp <-function(dailyPrediction,parameters,dailyWeather){
   ##init assignment of omega (defined or parameters deduced variable)
   if(length(dailyPrediction$omega)==0||dailyPrediction$omega==0){
     if(length(parameters@photo_sen)==0 || is.na(parameters@photo_sen)){
@@ -263,8 +333,8 @@ wang.f_photo_resp <-function(dailyPrediction,parameters,dailyWeather){
 ## input: p_vern_base, p_vern_full, vr_vern_temp_sum, p_temp_cardinal, vr_temp_avg
 ## output: vr_vern_resp_rate, vr_vern_temp_sum
 ## ref: P5,6
-wang.f_vern_resp <-function(dailyPrediction,parameters,dailyWeather){
-  dailyPrediction <- wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"VN")
+we.f_vern_resp <-function(dailyPrediction,parameters,dailyWeather){
+  dailyPrediction <- we.f_temp_resp(dailyPrediction,parameters,dailyWeather,"VN")
   if(parameters@vern_full==0){ ## no reduction from vernerisation
     dailyPrediction$vern_temp_sum<-1
     dailyPrediction$vern_resp_rate<-1
@@ -292,13 +362,13 @@ wang.f_vern_resp <-function(dailyPrediction,parameters,dailyWeather){
 ## input: vr_photo_resp_rate, p_temp_cardinal,vr_temp_avg, p_leave_prim_mx, p_leave_app_mx,vr_dev_v_rate,p_stage_fi_fl_itv,vr_stage_dev){
 ## output: vr_leave_prim_rate,vr_leave_app_rate,vr_leave_unemerge,vr_leave_sum
 ##assumption: after floral initiation, no new leaf primodia initiation
-wang.f_leave <-function(dailyPrediction,parameters,dailyWeather){
+we.f_leave <-function(dailyPrediction,parameters,dailyWeather){
   if(dailyPrediction$stage_dev<0||dailyPrediction$stage_dev>0.65)return(dailyPrediction);
   
   ##R(If,app), A(if)
   if(dailyPrediction$stage_dev<=0.2){ ## b4 floral initiation
     ##R(prim,ini), A(if,u)
-    dailyPrediction<-wang.f_temp_resp(dailyPrediction,parameters,dailyWeather,"IF")
+    dailyPrediction<-we.f_temp_resp(dailyPrediction,parameters,dailyWeather,"IF")
     temp_resp<-dailyPrediction$leave_temp_resp
     
     photo_resp<-dailyPrediction$photo_resp_rate
@@ -326,7 +396,7 @@ wang.f_leave <-function(dailyPrediction,parameters,dailyWeather){
 ## happen about terminal spikelet, assume stop at emd of vegetative stage
 ## input: p_node_mx,p_temp_cardinal,vr_temp_avg,vr_photo_resp_rate,vr_stage_dev
 ## output: vr_node_rate, vr_node_sum
-wang.f_node <-function(dailyPrediction,parameters,dailyWeather){
+we.f_node <-function(dailyPrediction,parameters,dailyWeather){
   if(dailyPrediction$stage_dev<0.45||dailyPrediction$stage_dev>1)return(dailyPrediction);
   node_rate<-parameters@node_mx*dailyPrediction$temp_resp_rate*dailyPrediction$photo_resp_rate
   node_sum<-dailyPrediction$node_sum+node_rate
@@ -339,7 +409,7 @@ wang.f_node <-function(dailyPrediction,parameters,dailyWeather){
 ## f(tiller)
 ## input: vr_leave_sum
 ## output: vr_till_main_sum 
-wang.f_tiller <-function(dailyPrediction,parameters,dailyWeather){
+we.f_tiller <-function(dailyPrediction,parameters,dailyWeather){
   if(dailyPrediction$stage_dev<0||dailyPrediction$stage_dev>0.45)return(dailyPrediction);
   till_main_sum<- max(0,dailyPrediction$leave_sum-2.5)
   dailyPrediction$till_main_sum<-till_main_sum
@@ -349,7 +419,7 @@ wang.f_tiller <-function(dailyPrediction,parameters,dailyWeather){
 ## function to calculate EC stage
 ## input: vr_stage_dev,vr_leave_sum,vr_node_sum,vr_till_main_sum,p_stage_vr_ec_tbl
 ## output: vr_stage_ec
-wang.f_stage_ec <-function(dailyPrediction,parameters){
+we.f_stage_ec <-function(dailyPrediction,parameters){
   stage_dev<-dailyPrediction$stage_dev
   stage_ec<-0
   if(stage_dev<0){
@@ -384,8 +454,8 @@ wang.f_stage_ec <-function(dailyPrediction,parameters){
 #'#########################
 
 ## read param
-wang.set_param <-function(str_param_file, parameters, conf_id=1){
-  parameters@model<-as.character("wang")
+we.set_param <-function(str_param_file, parameters, conf_id=1){
+  parameters@model<-as.character("we")
   
   parameter_table <- read.xlsx(str_param_file,sheetName = "parameters")
   parameter_table <- filter(parameter_table, id==conf_id)

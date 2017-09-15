@@ -1,5 +1,5 @@
 library(data.table)
-
+library(xlsx)
 #' Title
 #'
 #' @param weatherRow
@@ -29,7 +29,7 @@ as.Weather <- function(weatherRow, weatherObj=NULL) {
 #' @param end_date end of the loaded datafile
 #' @param weather_actual_end input for case to merge actual & predict weather in a file
 #' @param maxRow maximum amount of row loaded from excel sheet. [default: 3650 (10years)]
-#'
+#' @param mode actual|forecast
 #' @return
 #' @export
 #'
@@ -38,8 +38,9 @@ load.weather <-
   function(str_weather_file,
            start_date = NULL,
            end_date =NULL,
-           weather_actual_end = NULL,
-           maxRow = 3650) {
+           # weather_actual_end = NULL,
+           maxRow = 3650,
+           mode='actual') {
     sheets <- excel_sheets(str_weather_file)
     if (!"actual" %in% sheets && !"forecast" %in% sheets) {
       stop("No weather sheet 'actual' or 'forecast' in the file:",str_weather_file)
@@ -47,38 +48,50 @@ load.weather <-
     
     if(!is.null(start_date)) start_date<-as.POSIXct(start_date)
     if(!is.null(end_date)) end_date<-as.POSIXct(end_date)
-    if(!is.null(weather_actual_end)) end_date<-as.POSIXct(weather_actual_end)
-    
-    if ("actual" %in% sheets) {
-      actual_weather_data <-
-        read_excel(str_weather_file, sheet = "actual", n_max = maxRow)
+    # if(!is.null(weather_actual_end)) end_date<-as.POSIXct(weather_actual_end)
+    if(mode=='actual'){
+      if ("actual" %in% sheets) {
+          actual_weather_data <-
+            read_excel(str_weather_file, sheet = "actual", n_max = maxRow)
+      }else{
+        actual_weather_data <-
+          read_excel(str_weather_file, n_max = maxRow)
+      }
+      
       if(!is.null(start_date))
         actual_weather_data <-filter(actual_weather_data, actual_weather_data$date>=start_date)
       
       if(!is.null(end_date))
         actual_weather_data <-filter(actual_weather_data, actual_weather_data$date<=end_date)
         
-      if (is.null(weather_actual_end)){
-        weather_actual_end<-actual_weather_data$date[nrow(actual_weather_data)]
-      } else{
-        actual_weather_data <-filter(actual_weather_data, actual_weather_data$date<=weather_actual_end)
-      }
+      # if (is.null(weather_actual_end)){
+      #   weather_actual_end<-actual_weather_data$date[nrow(actual_weather_data)]
+      # } else{
+      #   actual_weather_data <-filter(actual_weather_data, actual_weather_data$date<=weather_actual_end)
+      # }
       
       actual_weather_data$source<-with(actual_weather_data,"actual")
+      actual_weather_data$date=as.POSIXct(actual_weather_data$date,tz="UTC")
+      weather_data<-actual_weather_data
     }
-    if ("forecast" %in% sheets) {
-      forecast_weather_data <-
-        read_excel(str_weather_file, sheet = "forecast", n_max = maxRow)
-      
-      actual_weather_data <-filter(forecast_weather_data, forecast_weather_data$date>weather_actual_end)
-      
-      if(!is.null(start_date))
-        actual_weather_data <-filter(forecast_weather_data, forecast_weather_data$date>=start_date)
+    if(mode=='forecast'){
+      if ("forecast" %in% sheets) {
+        forecast_weather_data <-
+          read_excel(str_weather_file, sheet = "forecast", n_max = maxRow)
+      }else{
+        forecast_weather_data <-
+          read_excel(str_weather_file, n_max = maxRow)
+      }
+      # actual_weather_data <-filter(forecast_weather_data, forecast_weather_data$date>weather_actual_end)
+     if(!is.null(start_date))
+        forecast_weather_data <-filter(forecast_weather_data, forecast_weather_data$date>=start_date)
       
       if(!is.null(end_date))
-        actual_weather_data <-filter(forecast_weather_data, forecast_weather_data$date<=end_date)
+        forecast_weather_data <-filter(forecast_weather_data, forecast_weather_data$date<=end_date)
       
       forecast_weather_data$source<-with(forecast_weather_data,"forecast")
+      forecast_weather_data$date=as.POSIXct(forecast_weather_data$date,tz="UTC")
+      weather_data<-forecast_weather_data
     }
     
     # date selection
@@ -92,18 +105,18 @@ load.weather <-
     # }
     
     ##merge actual with forecast data
-    if(exists("actual_weather_data") && exists("forecast_weather_data")){
-      weather_data <-
-        rbind.data.frame(actual_weather_data,forecast_weather_data)
-    }else if(exists("actual_weather_data")){
-        weather_data <- actual_weather_data
-    }else if(exists("forecast_weather_data")){
-        weather_data <- forecast_weather_data
-    }
+    # if(exists("actual_weather_data") && exists("forecast_weather_data")){
+    #   weather_data <-
+    #     rbind.data.frame(actual_weather_data,forecast_weather_data)
+    # }else if(exists("actual_weather_data")){
+    #     weather_data <- actual_weather_data
+    # }else if(exists("forecast_weather_data")){
+    #     weather_data <- forecast_weather_data
+    # }
     
     #check if any missing day
     if(nrow(weather_data)<as.numeric(difftime(weather_data$date[nrow(weather_data)],weather_data$date[1],"days"))){
-      warning("The weather file has missing date!!! Simulation will be wrong. Please check the file.")
+      warning("The weather file has missing date!!! Please check the file.")
     }
       
     return(as.data.table(weather_data))
@@ -183,9 +196,9 @@ load.phenoWeather.data<-function(stdPhenology,stdWeather){
     }
   }
 }
-writeResult<-function(str_outfile,result,parameters){
+writeResult<-function(str_outfile,result,parameters,sheet="Result"){
   write.xlsx(as.data.frame(parameters),file=str_outfile,append=TRUE,sheetName = "Parameters")
-  write.xlsx(result,file=str_outfile,append=TRUE,sheetName = "Result")
+  write.xlsx(result,file=str_outfile,append=TRUE,sheetName = sheet)
 }
 
 #' Retrieve the trivial EC stage achieved by a simulated continuous EC value.

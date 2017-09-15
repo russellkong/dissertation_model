@@ -1,3 +1,4 @@
+library(dplyr)
 #'##################################################
 #'Result
 #'##################################################
@@ -19,26 +20,59 @@ analysis.temp.err.rmse <- function(str_fore_file=NULL,str_act_file=NULL,forecast
   return(rmse)
 }
 #' display plot of variance and cumlative error along the selected period
-analysis.temp.err.plot<- function(tempDiffDF){
+analysis.temp.err.plot<- function(tempDiffDF,title="analysis.temp.err.plot"){
+  # print(
+  #   ggplot(tempDiffDF,aes(x=date,y=err))+
+  #     geom_line()+
+  #     ylab("Temp. Difference (Fore. - Act.) (oC)") +
+  #     xlab("Month") +
+  #     ggtitle(title)+
+  #     geom_smooth(method=loess,   # Add linear regression lines
+  #                                 #se=FALSE,    # Don't add shaded confidence region
+  #                 fullrange=TRUE) # Extend regression lines)
+  # )
+  # print(
+  #   ggplot(tempDiffDF)+
+  #   # geom_line(aes(x=date,y=temp_avg_act,colour="Act. Temp."),size=1.5)+
+  #   # geom_line(aes(x=date,y=temp_avg_fore,colour="Fore. Temp."),size=1.5)+
+  #   # geom_line(aes(x=date,y=err,colour="error"),linetype="dashed")+
+  #   geom_line(aes(x=date,y=cum_err,colour="cum_err")) +
+  #     ylab("Temperature (oC)") +
+  #     xlab("Date") +
+  #     ggtitle(title)
+  # )
   print(
     ggplot(tempDiffDF)+
-    geom_line(aes(x=date,y=temp_avg_act,colour="Act. Temp."),size=1.5)+
-    geom_line(aes(x=date,y=temp_avg_fore,colour="Fore. Temp."),size=1.5)+
-    geom_line(aes(x=date,y=err,colour="error"),linetype="dashed")+
-    geom_line(aes(x=date,y=cum_err,colour="cum_err"),linetype="dashed") +
-      xlab("Temperature (oC)") +
-      ggtitle("analysis.temp.err.plot")
+      # geom_line(aes(x=date,y=temp_avg_act,colour="Act. Temp."),size=1.5)+
+      # geom_line(aes(x=date,y=temp_avg_fore,colour="Fore. Temp."),size=1.5)+
+      # geom_line(aes(x=date,y=err,colour="error"),linetype="dashed")+
+      geom_line(aes(x=date,y=cum_err)) +
+      ylab("Cumulative Temp. Difference (oC)") +
+      xlab("Month") +
+      ggtitle(title)
   )
-  #' between dataset
-  cor.test(tempDiffDF$temp_avg_fore, tempDiffDF$temp_avg_act, alternative="two.sided", method="pearson")
-  scatterplot(temp_avg_fore~temp_avg_act, reg.line=lm, smooth=FALSE, spread=FALSE, 
-              boxplots=FALSE, span=0.5, ellipse=FALSE, levels=c(.5, .9), data=tempDiffDF)
-  
-  #' On the deviation
-  #shapiro-wilk normality test
-  shapiro.test(tempDiffDF$err)
-  #One-sample Kolmogorov-Smirnov test
-  ks.test(tempDiffDF$err,pnorm,alternative="two.sided")
+ #'  #' between dataset
+ #'  print(cor.test(tempDiffDF$temp_avg_fore, tempDiffDF$temp_avg_act, alternative="two.sided", method="pearson"))
+ #' #'  
+ #' #'  print(scatterplot(temp_avg_fore~temp_avg_act, reg.line=lm, smooth=FALSE, spread=FALSE, 
+ #' #'        boxplots=FALSE, span=0.5, ellipse=FALSE, levels=c(.5, .9), data=tempDiffDF))
+ #' #'        
+ #'  print(ggplot(tempDiffDF, aes(x=temp_avg_act,y=temp_avg_fore))+
+ #'    geom_point(shape=18,size=2)+
+ #'    xlab("Actual Temperature (oC)") +
+ #'    ylab("Forecast Temperature (oC)") +
+ #'    ggtitle(title)+
+ #'      geom_abline(intercept = 0,slope = 1, colour='blue',size=1)
+ #'    # geom_smooth(method=lm,   # Add linear regression lines
+ #'    #             #se=FALSE,    # Don't add shaded confidence region
+ #'    #             fullrange=TRUE) # Extend regression lines)
+ #'  )
+  lm(formula = temp_avg_fore ~ temp_avg_act, data = diff_weather_for_act_coc_2016)
+ #'  #' On the deviation
+ #'  #shapiro-wilk normality test
+ #' print( shapiro.test(tempDiffDF$err))
+ #'  #One-sample Kolmogorov-Smirnov test
+ #'  print(ks.test(tempDiffDF$err,pnorm,alternative="two.sided"))
 }
 
 analysis.temp.err <- function(str_fore_file=NULL,str_act_file=NULL,forecastDF=NULL, actualDF=NULL, start_date=NULL,end_date=NULL){
@@ -48,8 +82,14 @@ analysis.temp.err <- function(str_fore_file=NULL,str_act_file=NULL,forecastDF=NU
   if(!is.null(str_act_file)){
     actualDF<-load.weather(str_weather_file = str_act_file,start_date = start_date,end_date =end_date)
   }
-  forecastDF<-filter(forecastDF,date>=start_date & date<=end_date)
-  actualDF<-filter(actualDF,date>=start_date & date<=end_date)
+  if(!is.null(start_date) ){
+    forecastDF<-filter(forecastDF,date>=start_date)
+    actualDF<-filter(actualDF,date>=start_date )
+  }
+  if(!is.null(end_date) ){
+    forecastDF<-filter(forecastDF,date<=end_date)
+    actualDF<-filter(actualDF,date<=end_date)
+  }
   
   tempDiffDF<-merge(forecastDF[,c("date","temp_min","temp_avg","temp_max")],actualDF[,c("date","temp_min","temp_avg","temp_max")],by="date",all=TRUE,suffixes = c("_fore","_act"))
   
@@ -101,7 +141,7 @@ analysis.obsDay.err.rmse <- function(obsDF,simDF,start_stage=0,end_stage=99) {
   rmse<-sqrt(mean(errList^2))
   return(rmse)
 }
-analysis.obsDay.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
+analysis.obsDay.err <- function(obsDF,simDF,start_stage=0,end_stage=99) {
   #day_err_df<-c()
   #mode 1: single stage
   # measured_stage <- measured_set[1,"stage_ec"]
@@ -164,7 +204,7 @@ analysis.gs.err.rmse <- function(obsDF,simDF,start_stage=0,end_stage=99) {
   rmse<-sqrt(mean(errList^2))
   return(rmse)
 }
-analysis.gs.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
+analysis.gs.err <- function(obsDF,simDF,start_stage=0,end_stage=99) {
 
   #init err column
   obsDF$err<-NA_real_
@@ -203,9 +243,13 @@ analysis.gs.err <- function(obsDF,simDF,simDFs,start_stage=0,end_stage=99) {
 #' 
 #' @param baseDF the subject to be compared by simDFList 
 #' @param simDFList list of the objects need comparsion, names to identify model_source
-analysis.model.sim_diff<-function(baseDF, simDFList){
+analysis.model.sim_diff<-function(baseDF, simDFs, simlabels){
   simDiffDF<-data.frame()
-  simDFList<-list(baseDF,simDFList)
+  simDFList=list()
+  simDFList[[1]]<-baseDF
+  for(i in 1:length(simDFs)){
+    simDFList[[i+1]]<-simDFs[[i]]
+  }
   for(i in 1:length(simDFList)){
     
     simDFList[[i]]$stage_ec<-sapply(simDFList[[i]]$stage_ec, FUN= rounddown_ec)
@@ -217,10 +261,11 @@ analysis.model.sim_diff<-function(baseDF, simDFList){
     if(i==1){
       simDiffDF<-tmpDF
     }else{
-      tmpDF$diff_du<-simDiffDF$duration - tmpDF$duration
-      tmpDF$diff_fd<-simDiffDF$first_day - tmpDF$first_day
-      names(tmpDF)[2:5]<-paste(names(tmpDF)[2:5],names(simDFList[i]),sep = "_")
+      names(tmpDF)[2:3]<-paste(names(tmpDF)[2:3],simlabels[i-1],sep = "_")
       simDiffDF<-merge(x=simDiffDF,y=tmpDF,by="stage_ec",all = TRUE)
+      eval(parse(text=paste("simDiffDF$diff_du_",simlabels[i-1],"<-simDiffDF$duration_",simlabels[i-1], "- simDiffDF$duration ",sep = "")))
+      eval(parse(text=paste("simDiffDF$diff_fd_",simlabels[i-1],"<-simDiffDF$first_day_",simlabels[i-1],"- simDiffDF$first_day ",sep = "")))
+      
     }
   }
 

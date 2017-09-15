@@ -1,5 +1,5 @@
 library(lubridate)
-
+PE.modelExecutionCount<<-0
 PE.START_YEAR<<-0000
 PE.END_YEAR<<-2017
 PE.SITE_OPT_OUT<<-c()
@@ -22,8 +22,7 @@ cwm.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
                            str_measured_files=NULL,list_site_phenology=NULL,
                            start_year=NULL,end_year=NULL,optOutSites=NULL,optInSites=NULL,
                            str_outfile = NULL,
-                           conf_id = 1,
-                           weather_actual_end = NULL, trail_start=1,trail_end=NULL,store_rs=FALSE){
+                           conf_id = 1, trail_start=1,trail_end=NULL,store_rs=FALSE){
   
   if(!exists("PE.resultObj"))PE.resultObj<<-list()
   
@@ -38,7 +37,7 @@ cwm.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
   
   #Preload all weather files
   if(is.null(list_site_weather))
-    list_site_weather<-load.weather.data(str_weather_files,weather_actual_end = weather_actual_end)
+    list_site_weather<-load.weather.data(str_weather_files)
   PE.weatherDT<<-lapply(FUN=as.data.table,list_site_weather) #performance handling
   PE.weatherDT<<-lapply(FUN=setindex,PE.weatherDT,"date")
   #Preload all measured data
@@ -173,14 +172,14 @@ cwm.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
 #' @param weather_actual_end 
 #' @param end_stage 
 #' 
-#' @example  wang.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"), "./Parameters/Wang_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"))
-wang.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
+#' @example  we.calibrate(c("./Weather/W_100EA002_2016.xlsx","./Weather/W_nafferton_2017.xlsx"), "./Parameters/WE_Parameters.xlsx",c("./Phenology/P_WindsorWest_2016.xlsx"))
+we.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
                            str_param_file,
                            str_measured_files,list_site_phenology=NULL,
                            start_year=NULL,end_year=NULL,optOutSites=NULL,optInSites=NULL,
                            str_outfile = NULL,
                            conf_id = 1,
-                           weather_actual_end = NULL, trail_start=1,trail_end=NULL,store_rs=FALSE){
+                           trail_start=1,trail_end=NULL,store_rs=FALSE){
   
   if(!exists("PE.resultObj"))PE.resultObj<<-list()
   
@@ -195,7 +194,7 @@ wang.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
   
   #Preload all weather files
   if(is.null(list_site_weather))
-    list_site_weather<-load.weather.data(str_weather_files,weather_actual_end = weather_actual_end)
+    list_site_weather<-load.weather.data(str_weather_files)
   PE.weatherDT<<-lapply(FUN=as.data.table,list_site_weather) #performance handling
   
   #Preload all measured data
@@ -204,8 +203,8 @@ wang.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
   PE.phenologyDT<<-lapply(FUN=as.data.table,list_site_phenology) #performance handling
   
   #load parameters
-  parameters_def <- new('WangParameterSet')
-  parameters_def <- wang.set_param(str_param_file, parameters_def, conf_id)
+  parameters_def <- new('WEParameterSet')
+  parameters_def <- we.set_param(str_param_file, parameters_def, conf_id)
   
   if(!exists("PE.pheoWeatherDT"))
     load.phenoWeather.data(stdPhenology = PE.phenologyDT,stdWeather = PE.weatherDT)
@@ -289,14 +288,14 @@ wang.calibrate <- function(str_weather_files=NULL,list_site_weather=NULL,
     if(!is.null(trail_end) && i>trail_end) break
     
     OLS<-calibrate.optim(par=param_init[[i]], 
-                         fn=calibrate.wang.rmse,
+                         fn=calibrate.we.rmse,
                          lower = param_lower[[i]], upper = param_upper[[i]],parscale=parscale[[i]],
                          param_custom_opti=param_opti[[i]],param_def=parameters_def,
                          end_stage=as.numeric(end_stage[i]),store_rs)
     #put optim par into parameter
-    parameters_def<-wang.param.replace(parameters_def,param_opti[[i]],OLS$par)
+    parameters_def<-we.param.replace(parameters_def,param_opti[[i]],OLS$par)
     parameters_def_hist<-rbind(parameters_def_hist,as.data.frame(parameters_def))
-    saveRDS(parameters_def_hist,"./Parameters/WangParameterInProgress.rds")
+    saveRDS(parameters_def_hist,"./Parameters/WEParameterInProgress.rds")
   }
   
   #remove(PE.weatherDT,pos = ".GlobalEnv" )
@@ -433,7 +432,7 @@ cwm.param.replace <-function(param_def,param_custom_opti,param_custom){
 
 
 
-wang.param.replace <-function(param_def,param_custom_opti,param_custom){
+we.param.replace <-function(param_def,param_custom_opti,param_custom){
   #replace default values in param file
   names(param_custom)<-param_custom_opti
   if("temp_v_min" %in% param_custom_opti) param_def@temp_cardinal["V","MIN"]<-param_custom["temp_v_min"]
@@ -482,11 +481,11 @@ calibrate.cwm.rmse <- function(...){
   return(calibrate.rmse(modelFUN=cwm.main, paramReplaceFUN=cwm.param.replace, ...))
 }
 
-calibrate.wang.rmse <- function(...){
-  return(calibrate.rmse(modelFUN=wang.main, paramReplaceFUN=wang.param.replace, ...))
+calibrate.we.rmse <- function(...){
+  return(calibrate.rmse(modelFUN=we.main, paramReplaceFUN=we.param.replace, ...))
 }
 
-collective.rmse <- function(str_weather_files=NULL,weather_actual_end = NULL,list_site_weather=NULL,
+collective.rmse <- function(str_weather_files=NULL,list_site_weather=NULL,
                             str_phenology_files=NULL,list_site_phenology=NULL,
                             str_param_file,parameters_def=NULL,conf_id = 1,
                             start_year=NULL,end_year=NULL,optOutSites=NULL,
@@ -500,7 +499,7 @@ collective.rmse <- function(str_weather_files=NULL,weather_actual_end = NULL,lis
   
   #Preload all weather files
   if(is.null(list_site_weather))
-    list_site_weather<-load.weather.data(str_weather_files,weather_actual_end = weather_actual_end)
+    list_site_weather<-load.weather.data(str_weather_files)
   PE.weatherDT<<-lapply(FUN=as.data.table,list_site_weather) #performance handling
   PE.weatherDT<<-lapply(FUN=setindex,PE.weatherDT,"date")
   #Preload all measured data

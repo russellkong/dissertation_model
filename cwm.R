@@ -2,6 +2,7 @@ library(readxl)
 library(xlsx)
 library(dplyr)
 library(data.table)
+library(lubridate)
 ## Coding of CWm's Small grain cereal phenology model
 ## Author: Russell Kong
 ## Date: 19 JUN 2017
@@ -19,24 +20,32 @@ library(data.table)
 #' @param weather_actual_end define end date of actual weather data reading, continue with predicted data
 #' @param parameters_df custom dataframe for parameters. For calibration use. Ignore file location on applied
 #' @param weather_data_dt custom dataframe for weather data For calibration use, performance improvement on multiple iteration
-#'
+#' @param mode Normal: run model by defined weather files and configration, ProjectForecast: perform prediction on forecast weather saperate from actual weather
 #' @return data.frame (result of prediction)
 #' @export
 #'
 #' @examples cwm.main("weather.xlsx","CWM_Properties.xlsx", "out8.xlsx",1,"2016-02-01")
 #' naffertonSimDF=cwm.main(weather_data_dt = nafferton2016,str_param_file = "./Parameters/CWm_Parameters.xlsx",conf_id = 9,sown_date = "2016-04-17")
+#' cwm.main(str_weather_file = "./Weather/W_100EA002_2016.xlsx",str_weather_forecast_file = "./Weather/CocklePark_forecast_2016.xlsx",weather_actual_end_stage = 50, str_param_file = "./Parameters/CWm_Parameters.xlsx", conf_id=11,sown_date="2016-04-21")
 cwm.main <-
-  function(str_weather_file,
+  function(str_weather_file=NULL,str_weather_forecast_file=NULL,
            str_param_file,
            str_outfile = NULL,
            conf_id = 1,
            sown_date = NULL,
-           weather_actual_end = NULL,
+           weather_actual_end_date = NULL,
+           weather_actual_end_stage= NULL,
            parameters_df = NULL,
            weather_data_dt = NULL,
+           weather_forecast_dt = NULL,
            end_stage = 99,
-           verbose=TRUE) {
+           verbose=TRUE,
+           mode="Normal") {
     #' initation
+    #' initation
+    sown_date<-as.POSIXct(sown_date,tz = "UTC")
+    if(!is.null(weather_actual_end_date))
+      weather_actual_end_date<-as.POSIXct(weather_actual_end_date,tz = "UTC")
     
     ## set parameters
     if (is.null(parameters_df)) {
@@ -48,15 +57,24 @@ cwm.main <-
     
     
     ## load Weather data
-    if (is.null(weather_data_dt)) {
-      weather_data <-
-        load.weather(str_weather_file,
-                     weather_actual_end = weather_actual_end,
-                     start_date = sown_date)
-    } else{
-      #weather_data <- filter(weather_data_df, date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365))
-      weather_data <- weather_data_dt[date >= as.POSIXct(sown_date) & date <= as.POSIXct(sown_date)+days(365)]
+    weather_data=NULL
+    if (!is.null(weather_data_dt)) {
+      weather_data <- weather_data_dt[date >= sown_date & date <= sown_date+days(365)]
+    }else if(!is.null(str_weather_file)) {
+        weather_data <-
+          load.weather(str_weather_file,
+                       start_date = sown_date)
     }
+    weather_forecast=NULL
+    if (!is.null(weather_forecast_dt)){
+      weather_forecast <- weather_forecast_dt[date >= sown_date & date <= sown_date+days(365)]
+    } else if(!is.null(str_weather_forecast_file)) {
+        weather_forecast <-
+          load.weather(str_weather_forecast_file,
+                       start_date = sown_date,
+                       mode="forecast")
+    }
+    if(!exists("weather_data") && !exists("weather_forecast")){stop("No input weather")}
     
     ## init variables
     dailyWeather <- new('Weather')
@@ -69,22 +87,45 @@ cwm.main <-
     dailyPrediction$leave_prim <- parameters@leave_prim_init
     dailyPrediction$leave_emerg <- parameters@leave_emerg_init
     
-    progress <- as.list(nrow(weather_data))
-    
+    progress <- as.list(365)
+    if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+      forecastProgress<-as.list(365)#section 2
+    }
     #' Modelling Loop
     if(verbose)print_detail(paste("Number available weather days: ", nrow(weather_data)))
-    if(verbose)print_progress("Start Processing: \n")
+    if(verbose)print_progress("Start Processing: ")
     
-    for (i in 1:nrow(weather_data)) {
-      weatherRow <- weather_data[i,]
+    i=1
+    cur_date=sown_date
+    while (dailyPrediction$stage_ec < 99 &&
+           dailyPrediction$stage_ec < next_ec(end_stage) && 
+           i < 365) {
+      
+      if(!is.null(weather_data) && 
+         (is.null(weather_actual_end_stage) || dailyPrediction$stage_ec<weather_actual_end_stage) &&
+         (is.null(weather_actual_end_date) || cur_date<weather_actual_end_date)
+      ){
+        weatherRow <- weather_data[date == cur_date,]
+        if(nrow(weatherRow)==0 && !is.null(weather_forecast)){
+          weatherRow <- weather_forecast[date == cur_date,]
+        }
+      }else if(!is.null(weather_forecast)){
+        weatherRow <- weather_forecast[date == cur_date,]
+      }
+      if(nrow(weatherRow)==0){
+        print_critical(paste("No matching weather data for the date|",cur_date))
+        break
+      }
+        
       ## bind daily weather data
       dailyWeather <- weatherRow#as.Weather(weatherRow, dailyWeather)
       ## process the model
       dailyPrediction$day <- i - 1
       dailyPrediction$date <- dailyWeather$date
-      if(i>1)
+      if(i>1){
         dailyPrediction <-
           cwm.process(dailyPrediction, parameters, dailyWeather)
+      }
       
       ##Log result
       dailyPrediction$weather_source <- dailyWeather$source
@@ -94,6 +135,25 @@ cwm.main <-
       # resultDF <- as.data.frame(dailyPrediction)
       # }
       progress[[i]] <- dailyPrediction
+      
+      #Section 2: project forecast to 9 days
+      if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+        forecastPrediction<-dailyPrediction
+        for(j in 1:9){
+          # single forecast file used, ideal if daily forecast of each following day from the cur_date is available
+          forecastWeatherRow <- weather_forecast[date == cur_date+days(j),]
+          if(nrow(forecastWeatherRow)==0) {
+            print_critical(paste("No matching weather data for forecast date|",cur_date,cur_date+days(j))) 
+            break
+          }
+          forecastPrediction$day <- i-1+j
+          forecastPrediction$date <- cur_date+days(j)
+          forecastPrediction$weather_source <- forecastWeatherRow$source
+          forecastPrediction<-cwm.process(forecastPrediction,parameters,forecastWeatherRow )
+        }
+        #only the ninth day retained
+        forecastProgress[[i]]<-forecastPrediction
+      }
       
       if(verbose)print_detail(
         paste(
@@ -108,20 +168,29 @@ cwm.main <-
       )
       ## log into csv file
       #wang.write_prediction(dailyPrediction)
-      if (dailyPrediction$stage_ec > 99 || dailyPrediction$stage_ec >= next_ec(end_stage) || i > 1000)
-        break
+      i<-i+1
+      cur_date<-cur_date+days(1)
     }
     
     resultDF<-rbindlist(progress)
-    
+    if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+      forecastResultDF<-rbindlist(forecastProgress)
+    }
     #' Output handling
-    if (!is.null(str_outfile))
+    if (!is.null(str_outfile)){
       writeResult(paste("./output/CWm",weather_data[1,]$site,str_outfile,sep = "_"), resultDF, parameters)
+      if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+        writeResult(paste("./output/CWm",weather_data[1,]$site,str_outfile,sep = "_"), forecastResultDF, parameters,sheet="forecast")
+      }
+    }
     #write.xlsx(resultDF,file=str_outfile,append=TRUE)
     if(verbose)print_progress(paste("Row processed: ", i))
+    
+    if(mode=="ProjectForecast" && !is.null(weather_forecast)){
+      return(list(result=resultDF,forecast=forecastResultDF))
+    }
+    
     return(resultDF)
-    ## close infile
-    ## close outfile
   }
 
 #'##########################

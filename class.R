@@ -111,7 +111,7 @@ setMethod("as.data.frame", "ParameterSet",
           })
 
 
-setClass("WangPrediction",
+setClass("WEPrediction",
          representation(
            temp_resp_rate="numeric",
            photo_resp_rate="numeric",
@@ -154,7 +154,7 @@ setClass("WangPrediction",
            omega=0,
            date=as.POSIXct("1970-01-01")
          ), contains = "Prediction")
-setClass("WangParameterSet",
+setClass("WEParameterSet",
          representation(
            temp_cardinal="data.frame",
            temp_emerg_sum="numeric",

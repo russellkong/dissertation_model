@@ -1,5 +1,6 @@
 
 library(ggplot2)
+library(tidyr)
 
 plot.EC <- function(wangDF, cwmDF) {
   rs_wang<- wangDF[,c("day","stage_ec")]
@@ -32,7 +33,7 @@ plot.EC <- function(wangDF, cwmDF) {
 #' @export
 #'
 #' @examples plot.Sim_Obs(PE.resultObj.working$resultDF[[147]][[1]],measured_df)
-plot.Sim_Obs <- function(obsDF,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NULL) {
+plot.Sim_Obs <- function(obsDF=NULL,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NULL) {
   
   #rename fore sim DF for merge
   rs_sim<-list()
@@ -50,35 +51,136 @@ plot.Sim_Obs <- function(obsDF,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NUL
   }else{
     stop("Either simDF/simDFs must be defined")
   }
+  if(!is.null(obsDF)){
   
-  #define names for observed DF for merge
-  rs_obs<- obsDF[,c("day","stage_ec")]
-  names(rs_obs) <-c("day","obs_ec")
-  
-  rs1<-rs_obs
-  for(i in 1:length(rs_sim)){
-    rs1<-merge(rs1,rs_sim[[i]],by="day",all=TRUE)
-  }
-  
-  p<-ggplot(rs1)+
+    #define names for observed DF for merge
+    rs_obs<- obsDF[,c("day","stage_ec")]
+    names(rs_obs) <-c("day","obs_ec")
+    
+    rs1<-rs_obs
+    for(i in 1:length(rs_sim)){
+      rs1<-merge(rs1,rs_sim[[i]],by="day",all=TRUE)
+    }
+    p<-ggplot(rs1)+
     geom_point( aes(x=day,y=obs_ec,colour="Observed"),shape=18,size=4)+
     
     ylab("Growth Stage (BBCH)") +
-    xlab("Day") +
+    xlab("Day(s) of Growth") +
     ggtitle(title)
+  }else{
+    rs1<-rs_sim[[1]]
+    for(i in 2:length(rs_sim)){
+      rs1<-merge(rs1,rs_sim[[i]],by="day",all=TRUE)
+    }
+    p<-ggplot(rs1)+
+      ylab("Growth Stage (BBCH)") +
+      xlab("Day") +
+      ggtitle(title)
+  }
   
+  # geom_point( aes(x=day,y=",simDFs_leg[i],"_ec,shape=\"",simDFs_leg[i],"\")) ++ 
+  # linetype = \"",simDFs_leg[i],"\",
+                 # scale_color_grey()
   p_str<-"p <- p "
   for(i in 1:length(rs_sim)){
-    p_str<-paste(p_str,"+ geom_point( aes(x=day,y=",simDFs_leg[i],"_ec,colour=\"Simulated_",simDFs_leg[i],"\"),shape=4) +
-              geom_line( aes(x=day,y=",simDFs_leg[i],"_ec,colour=\"Simulated_",simDFs_leg[i],"\"),size=1)",sep = "")
+    p_str<-paste(p_str,"+ 
+              
+              geom_line( aes(x=day,y=",simDFs_leg[i],"_ec,color = \"",simDFs_leg[i],"\"),size=1) +
+                 scale_x_continuous(breaks = c(seq(0,150,by=10))) +
+                 scale_y_continuous(breaks = c(seq(0,150,by=10))) ",sep = "")
   }
   print_debug(parse(text=p_str))
   eval(parse(text=p_str))
   print(p)
   #'--------------------------------
   #'
- 
-  rs2<-gather(rs1, sources,sim_ec,-c(day,obs_ec))
+  #'
+  if(!is.null(obsDF)){
+     rs2<-gather(rs1, sources,sim_ec,-c(day,obs_ec))
+      print("lm")
+      lm.rs<-lm(sim_ec~obs_ec,data=rs2)
+      print(summary(lm.rs))
+      #print(plot(lm.rs,las=1))
+      
+      p2<-ggplot(rs2, aes(x=obs_ec,y=sim_ec))+
+        geom_point(shape=18,size=4)+
+        xlab("Observed Stage (BBCH)") +
+        ylab("Simulated Stage (BBCH)") +
+        #ggtitle(title)+ 
+        geom_smooth(method=lm,   # Add linear regression lines
+                    #se=FALSE,    # Don't add shaded confidence region
+                    fullrange=TRUE) # Extend regression lines
+      
+      #print_debug(parse(text=p2_str))
+      #eval(parse(text=p2_str))
+      print(p2)
+  }
+  
+  return(rs1)
+}
+plot.Sim_Obs.date <- function(obsDF=NULL,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NULL) {
+#rename fore sim DF for merge
+rs_sim<-list()
+if(!is.null(simDFs)){
+  if(is.null(simDFs_leg))simDFs_leg<-names(simDFs)
+  for(i in 1:length(simDFs)){
+    rs_sim[[i]]<-simDFs[[i]][,c("date","stage_ec")]
+    
+    names(rs_sim[[i]])<-c("date",paste(simDFs_leg[i],"_ec",sep = ""))
+  }
+}else if(!is.null(simDF)){
+  if(is.null(simDFs_leg))simDFs_leg[1]<-"result"
+  rs_sim[[1]]<- simDF[,c("date","stage_ec")]
+  names(rs_sim[[1]])<-c("date",paste(simDFs_leg[1],"_ec",sep = ""))
+}else{
+  stop("Either simDF/simDFs must be defined")
+}
+if(!is.null(obsDF)){
+  
+  #define names for observed DF for merge
+  rs_obs<- obsDF[,c("date","stage_ec")]
+  names(rs_obs) <-c("date","obs_ec")
+  
+  rs1<-rs_obs
+  for(i in 1:length(rs_sim)){
+    rs1<-merge(rs1,rs_sim[[i]],by="date",all=TRUE)
+  }
+  p<-ggplot(rs1)+
+    geom_point( aes(x=date,y=obs_ec,colour="Observed"),shape=18,size=4)+
+    
+    ylab("Growth Stage (BBCH)") +
+    xlab("Date") +
+    ggtitle(title)
+}else{
+  rs1<-rs_sim[[1]]
+  for(i in 2:length(rs_sim)){
+    rs1<-merge(rs1,rs_sim[[i]],by="date",all=TRUE)
+  }
+  p<-ggplot(rs1)+
+    ylab("Growth Stage (BBCH)") +
+    xlab("Date") +
+    ggtitle(title)
+}
+
+# geom_point( aes(x=date,y=",simDFs_leg[i],"_ec,shape=\"",simDFs_leg[i],"\")) ++ 
+# linetype = \"",simDFs_leg[i],"\",
+# scale_color_grey()
+p_str<-"p <- p "
+for(i in 1:length(rs_sim)){
+  p_str<-paste(p_str,"+ 
+               
+               geom_line( aes(x=date,y=",simDFs_leg[i],"_ec,color = \"",simDFs_leg[i],"\"),size=1) +
+              scale_x_datetime(date_breaks  = \"1 month\",date_labels =\"%b\") +
+               scale_y_continuous(breaks = c(seq(0,150,by=10))) ",sep = "")
+}
+print_debug(parse(text=p_str))
+eval(parse(text=p_str))
+print(p)
+#'--------------------------------
+#'
+#'
+if(!is.null(obsDF)){
+  rs2<-gather(rs1, sources,sim_ec,-c(date,obs_ec))
   print("lm")
   lm.rs<-lm(sim_ec~obs_ec,data=rs2)
   print(summary(lm.rs))
@@ -90,16 +192,91 @@ plot.Sim_Obs <- function(obsDF,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NUL
     ylab("Simulated Stage (BBCH)") +
     #ggtitle(title)+ 
     geom_smooth(method=lm,   # Add linear regression lines
-              #se=FALSE,    # Don't add shaded confidence region
-              fullrange=TRUE) # Extend regression lines
+                #se=FALSE,    # Don't add shaded confidence region
+                fullrange=TRUE) # Extend regression lines
   
   #print_debug(parse(text=p2_str))
   #eval(parse(text=p2_str))
   print(p2)
+}
+
+return(rs1)
+}
+
+plot.Sim_Obs.internal <- function(obsDF=NULL,simDF=NULL,simDFs=NULL,simDFs_leg=NULL, title=NULL) {
+  #rename fore sim DF for merge
+  rs_sim<-list()
+  if(!is.null(simDFs)){
+    if(is.null(simDFs_leg))simDFs_leg<-names(simDFs)
+    for(i in 1:length(simDFs)){
+      rs_sim[[i]]<-simDFs[[i]][,c("day","stage_dev")]
+      
+      names(rs_sim[[i]])<-c("day",paste(simDFs_leg[i],"_ec",sep = ""))
+    }
+  }else if(!is.null(simDF)){
+    if(is.null(simDFs_leg))simDFs_leg[1]<-"result"
+    rs_sim[[1]]<- simDF[,c("day","stage_dev")]
+    names(rs_sim[[1]])<-c("day",paste(simDFs_leg[1],"_ec",sep = ""))
+  }else{
+    stop("Either simDF/simDFs must be defined")
+  }
+  
+  rs1<-rs_sim[[1]]
+  for(i in 2:length(rs_sim)){
+    rs1<-merge(rs1,rs_sim[[i]],by="day",all=TRUE)
+  }
+  p<-ggplot(rs1)+
+    ylab("Growth Stage (Internal)") +
+    xlab("Days of Growth") +
+    ggtitle(title)
+  
+  # geom_point( aes(x=date,y=",simDFs_leg[i],"_ec,shape=\"",simDFs_leg[i],"\")) ++ 
+  # linetype = \"",simDFs_leg[i],"\",
+  # scale_color_grey()
+  p_str<-"p <- p "
+  for(i in 1:length(rs_sim)){
+    p_str<-paste(p_str,"+ 
+                 
+                 geom_line( aes(x=day,y=",simDFs_leg[i],"_ec,color = \"",simDFs_leg[i],"\"),size=1) +
+                scale_x_continuous(breaks = c(seq(0,150,by=10))) ",sep = "")
+  }# scale_x_datetime(date_breaks  = \"1 month\",date_labels =\"%b\") +scale_y_continuous(breaks = c(seq(0,150,by=10)))
+  print_debug(parse(text=p_str))
+  eval(parse(text=p_str))
+  print(p)
   
   return(rs1)
 }
 
+plot.Sim_Obs.stageFirstDay.plot <- function(diffDF=NULL, title=NULL) {
+  lm.rs<-lm(first_day_sim~first_day,data=diffDF)
+  print(summary(lm.rs))
+   # print(plot(lm.rs,las=1))
+  
+  # p2<-ggplot(diffDF, aes(x=first_day,y=first_day_sim))+
+  #   geom_point(shape=18,size=2)+
+  #   xlab("Actual First Day (day)") +
+  #   ylab("Forecast First Day (day)") +
+  #   ggtitle(title)+ 
+  #   scale_x_continuous(breaks = c(seq(0,150,by=20)))+
+  #   scale_y_continuous(breaks = c(seq(0,150,by=20)))+
+  #   geom_abline(intercept = 0,slope = 1, colour='blue',size=1)
+  #   # geom_smooth(method=lm,   # Add linear regression lines
+  #   #             #se=FALSE,    # Don't add shaded confidence region
+  #   #             fullrange=TRUE) # Extend regression lines
+  # print(p2)
+  
+  p3<-ggplot(diffDF, aes(x=stage_ec,y=diff_fd_sim))+
+    geom_point(shape=18,size=2)+
+    xlab("Growth Stage (BBCH)") +
+    ylab("Diff. First Appearence Day (day)") +
+    ggtitle(title)+
+    scale_x_continuous(breaks = c(seq(0,150,by=10)))+
+    # scale_y_continuous(breaks = c(seq(-100,100,by=5)))+
+    geom_smooth(method=lm,   # Add linear regression lines
+                #se=FALSE,    # Don't add shaded confidence region
+                fullrange=TRUE) # Extend regression lines
+  print(p3)
+}
 #' Plat the geographic curve to optim zone
 #' HOW????
 #' 

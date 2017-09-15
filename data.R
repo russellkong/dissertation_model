@@ -14,6 +14,7 @@ data.weather.germany<-function(weatherData){
 }
 data.weather.preprocess.germany<-function(siteWeatherData){
   library(dplyr)
+ 
   weatherDF<-select(siteWeatherData$data,STATIONS_ID,MESS_DATUM,SDK,TMK,TXK,TNK)
   colnames(weatherDF)<-c("site","date","photo_len","temp_avg","temp_max","temp_min")
   if(any(is.na(weatherDF[,'photo_len']))){
@@ -36,4 +37,28 @@ data.data.phenology.preprocess.germany<-function(sitePhenologyData){
   #
   #DATE Phase_id BBCH HRVYR  Periode Qualitaetsniveau Eintrittsdatum_QB WTH_id SLT_id
   return(phenologyDF)
+}
+data.weather.loc<-function(){
+  station_ids=names(weatherData)
+  result=data.frame()
+  for(i in 1:length(station_ids)){
+    station_id=station_ids[i]
+    station_data=weatherData[[as.character(station_ids[i])]]
+    msl=station_data$msl
+    lat=station_data$loc[['LAT']]
+    lon=station_data$loc[['LON']]
+    result<-rbind(result,list(station_id=station_id,msl=msl,lat=lat,lon=lon))
+  }
+}
+data.pheno.loc<-function(){
+  station_ids=names(sbPheData)
+  result=data.frame(stringsAsFactors = FALSE)
+  for(i in 1:length(station_ids)){
+    station_id=station_ids[i]
+    station_data=sbPheData[[as.character(station_ids[i])]]
+    msl=station_data$msl
+    lat=station_data$loc[['LAT']]
+    lon=station_data$loc[['LON']]
+    result<-rbind(result,list(station_id=station_id,msl=msl,lat=lat,lon=lon),stringsAsFactors = FALSE)
+  }
 }

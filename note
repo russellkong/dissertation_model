@@ -43,3 +43,19 @@ plot.Sim_Obs(result_b4,obs_df)
 plot.Sim_Obs(result_opm,obs_df)
 rmse_day(result_b4,obs_df)
 rmse_day(result_opm,obs_df)
+
+========================================
+performance check
+
+profvis({plot.gradient()})
+
+===================================
+
+nafferton2016<-load.weather("./Weather/W_nafferton_2015_2016.xlsx","2016-01-01")
+S100EA002_2016<-load.weather("./Weather/W_100EA002_2016.xlsx","2016-01-01")
+nafferton2016<-data.fill_missing_date(nafferton2016,S100EA002_2016)
+
+======================================
+for(i in 2:length(avaData)){
+avaDF<-rbind(avaDF,as.data.frame(list(site=names(avaData[i]),year=unlist(avaData[i]))))
+}
